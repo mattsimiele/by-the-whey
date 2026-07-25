@@ -44,7 +44,7 @@ const emptyDraft: Draft = {
 type Submission = Draft & { id: string; slug: string; flavor_profile: string[]; pairings: string[]; profiles: { display_name: string; handle: string } };
 type Report = { id: string; target_type: string; target_id: string; reason: string; reason_code: string | null; status: string; created_at: string; reporter_handle: string; target_preview: string | null; target_user_id: string | null };
 type PhotoReview = { id: string; storage_path: string; created_at: string; signed_url?: string; tasting: { notes: string; rating: number; visibility: string; profile: { display_name: string; handle: string } } };
-type CatalogPhotoReview = { id: string; storage_path: string; created_at: string; public_url?: string; cheese: { name: string; creamery_name: string }; submitter: { display_name: string; handle: string } | null };
+type CatalogPhotoReview = { id: string; cheese_id: string; storage_path: string; created_at: string; public_url?: string; cheese: { name: string; creamery_name: string }; submitter: { display_name: string; handle: string } | null };
 type Account = { id: string; display_name: string; handle: string; role: Role; account_status: 'active' | 'warned' | 'suspended'; warning_count: number; moderation_note: string | null };
 
 export function CatalogManagement({ visible, role, userId, onClose }: { visible: boolean; role: Role; userId: string; onClose: () => void }) {
@@ -102,7 +102,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
   const loadCatalogPhotos = async () => {
     if (!supabase || role !== 'admin') return;
     const { data, error } = await supabase.from('cheese_photos')
-      .select('id,storage_path,created_at,cheese:cheese_id(name,creamery_name),submitter:submitted_by(display_name,handle)')
+      .select('id,cheese_id,storage_path,created_at,cheese:cheese_id(name,creamery_name),submitter:submitted_by(display_name,handle)')
       .eq('moderation_status', 'pending').order('created_at');
     if (error) return Alert.alert('Could not load catalog photo review', error.message);
     setCatalogPhotos((data ?? []).map((item) => ({
@@ -298,6 +298,10 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     if (approve) {
       const { error } = await supabase.from('cheese_photos').update({ moderation_status: 'approved', reviewed_by: userId, reviewed_at: new Date().toISOString() }).eq('id', photo.id);
       if (error) return Alert.alert('Could not approve catalog photo', error.message);
+      const { data: replaced } = await supabase.from('cheese_photos').select('id,storage_path').eq('cheese_id', photo.cheese_id).eq('moderation_status', 'approved').neq('id', photo.id);
+      const replacedPaths = (replaced ?? []).map((item) => item.storage_path);
+      if (replacedPaths.length) await supabase.storage.from('cheese-photos').remove(replacedPaths);
+      if (replaced?.length) await supabase.from('cheese_photos').delete().in('id', replaced.map((item) => item.id));
     } else {
       const { error: storageError } = await supabase.storage.from('cheese-photos').remove([photo.storage_path]);
       if (storageError) return Alert.alert('Could not remove catalog photo', storageError.message);
@@ -326,7 +330,11 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
       await supabase!.storage.from('cheese-photos').remove([storagePath]);
       return Alert.alert('Could not attach catalog photo', error.message);
     }
-    Alert.alert('Catalog photo added', `${cheese.name} will use the new photo after the app refreshes.`);
+    const { data: replaced } = await supabase!.from('cheese_photos').select('id,storage_path').eq('cheese_id', cheese.id).eq('moderation_status', 'approved').neq('storage_path', storagePath);
+    const replacedPaths = (replaced ?? []).map((item) => item.storage_path);
+    if (replacedPaths.length) await supabase!.storage.from('cheese-photos').remove(replacedPaths);
+    if (replaced?.length) await supabase!.from('cheese_photos').delete().in('id', replaced.map((item) => item.id));
+    Alert.alert('Catalog photo updated', `${cheese.name} will use the new photo after the catalog refreshes.`);
   };
 
   const fields: { key: keyof Draft; label: string; placeholder: string; multiline?: boolean }[] = [
@@ -397,7 +405,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
             {catalogPhotoSearch.trim().length > 1 && catalogCheeses.filter((item) => `${item.name} ${item.creamery_name}`.toLowerCase().includes(catalogPhotoSearch.trim().toLowerCase())).slice(0, 8).map((item) => (
               <View key={item.id} style={styles.catalogPhotoRow}>
                 <View style={{ flex: 1 }}><Text style={styles.accountName}>{item.name}</Text><Text style={styles.submitter}>{item.creamery_name}</Text></View>
-                <Pressable onPress={() => addExistingCatalogPhoto(item)} style={styles.roleToggle}><Text style={styles.roleToggleText}>Add photo</Text></Pressable>
+                <Pressable onPress={() => addExistingCatalogPhoto(item)} style={styles.roleToggle}><Text style={styles.roleToggleText}>Add / replace</Text></Pressable>
               </View>
             ))}
             <Text style={styles.queueHeading}>Catalog photography</Text>
