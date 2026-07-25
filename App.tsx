@@ -296,6 +296,7 @@ function DiscoverScreen({ openCheese, catalog, onNotifications }: { openCheese: 
 function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplete: () => void; catalog: Cheese[]; userId?: string; onNotifications: () => void }) {
   const [selected, setSelected] = useState<Cheese | null>(null);
   const [cheeseQuery, setCheeseQuery] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [rating, setRating] = useState(4.5);
   const [note, setNote] = useState('');
   const [isPublic, setIsPublic] = useState(true);
@@ -382,22 +383,32 @@ function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplet
       <ScrollView contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled">
         <AppHeader title="Log a tasting" subtitle="CAPTURE THE MOMENT" onNotifications={onNotifications} />
         <Text style={styles.fieldLabel}>WHAT ARE YOU TASTING?</Text>
-        <View style={styles.searchBox}>
+        {selected && !pickerOpen ? (
+          <Pressable style={styles.selectedCheeseSummary} onPress={() => setPickerOpen(true)}>
+            <CheeseArt name={selected.name} color={selected.color} size={46} />
+            <View style={{ flex: 1 }}><Text style={styles.cheeseName}>{selected.name}</Text><Text style={styles.selectCheeseMaker}>{selected.creamery} · {selected.category}</Text></View>
+            <Text style={styles.changeCheese}>Change</Text>
+          </Pressable>
+        ) : <View style={styles.searchBox}>
           <Ionicons name="search" size={20} color={colors.muted} />
-          <TextInput value={cheeseQuery} onChangeText={setCheeseQuery} placeholder="Search cheese, maker, or category…" placeholderTextColor="#9B958A" style={styles.searchInput} />
+          <TextInput autoFocus={pickerOpen} value={cheeseQuery} onFocus={() => setPickerOpen(true)} onChangeText={setCheeseQuery} placeholder="Search cheese, maker, or category…" placeholderTextColor="#9B958A" style={styles.searchInput} />
           {cheeseQuery ? <Pressable onPress={() => setCheeseQuery('')}><Ionicons name="close-circle" size={21} color={colors.muted} /></Pressable> : null}
-        </View>
-        <Text style={styles.searchHint}>{cheeseQuery ? `${cheeseResults.length} matching cheeses` : 'Start typing or choose from the first 12 cheeses'}</Text>
-        <View style={styles.cheesePickerResults}>
-          {cheeseResults.map((cheese) => (
-            <Pressable key={cheese.id} onPress={() => setSelected(cheese)} style={[styles.selectCheese, selected?.id === cheese.id && styles.selectCheeseActive]}>
-              <CheeseArt name={cheese.name} color={cheese.color} size={44} />
-              <View style={{ flex: 1 }}><Text style={styles.selectCheeseName}>{cheese.name}</Text><Text style={styles.selectCheeseMaker}>{cheese.creamery} · {cheese.category}</Text></View>
-              {selected?.id === cheese.id && <View style={styles.selectedCheck}><Ionicons name="checkmark" size={12} color={colors.white} /></View>}
-            </Pressable>
-          ))}
-        </View>
-        {!cheeseResults.length && <Text style={styles.noSearchResults}>No matching cheeses. A cheesemonger can submit a missing catalog entry.</Text>}
+        </View>}
+        {pickerOpen && (
+          <>
+            <Text style={styles.searchHint}>{cheeseQuery ? `${cheeseResults.length} matching cheeses` : 'Showing the first 12 cheeses'}</Text>
+            <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={styles.cheesePickerResults} contentContainerStyle={{ gap: 8 }}>
+              {cheeseResults.map((cheese) => (
+                <Pressable key={cheese.id} onPress={() => { setSelected(cheese); setCheeseQuery(''); setPickerOpen(false); }} style={[styles.selectCheese, selected?.id === cheese.id && styles.selectCheeseActive]}>
+                  <CheeseArt name={cheese.name} color={cheese.color} size={44} />
+                  <View style={{ flex: 1 }}><Text style={styles.selectCheeseName}>{cheese.name}</Text><Text style={styles.selectCheeseMaker}>{cheese.creamery} · {cheese.category}</Text></View>
+                  {selected?.id === cheese.id && <View style={styles.selectedCheck}><Ionicons name="checkmark" size={12} color={colors.white} /></View>}
+                </Pressable>
+              ))}
+              {!cheeseResults.length && <Text style={styles.noSearchResults}>No matching cheeses. A cheesemonger can submit a missing catalog entry.</Text>}
+            </ScrollView>
+          </>
+        )}
 
         <View style={styles.ratingPanel}>
           <Text style={styles.fieldLabel}>YOUR RATING</Text>
@@ -449,18 +460,22 @@ type CellarEntry = { cheese: Cheese; count: number; average: number; lastTasted:
 function CellarScreen({ openCheese, catalog, userId, reload, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; userId?: string; reload: number; onNotifications: () => void }) {
   const [segment, setSegment] = useState<'Tasted' | 'Want to try'>('Tasted');
   const [entries, setEntries] = useState<CellarEntry[]>([]);
+  const [savedCheeses, setSavedCheeses] = useState<Cheese[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!supabase || !userId || !catalog.length) {
       setEntries([]);
+      setSavedCheeses([]);
       return;
     }
     setLoading(true);
-    supabase.from('tastings').select('rating,created_at,cheeses:cheese_id(slug)').eq('user_id', userId).order('created_at', { ascending: false })
-      .then(({ data }) => {
+    Promise.all([
+      supabase.from('tastings').select('rating,created_at,cheeses:cheese_id(slug)').eq('user_id', userId).order('created_at', { ascending: false }),
+      supabase.from('saved_cheeses').select('created_at,cheeses:cheese_id(slug)').eq('user_id', userId).order('created_at', { ascending: false }),
+    ]).then(([tastingsResult, savedResult]) => {
         const grouped = new Map<string, { ratings: number[]; lastTasted: string }>();
-        for (const row of data ?? []) {
+        for (const row of tastingsResult.data ?? []) {
           const joined = row.cheeses as unknown as { slug: string } | null;
           if (!joined?.slug) continue;
           const current = grouped.get(joined.slug);
@@ -470,6 +485,11 @@ function CellarScreen({ openCheese, catalog, userId, reload, onNotifications }: 
         setEntries(Array.from(grouped.entries()).flatMap(([slug, value]) => {
           const cheese = catalog.find((item) => item.id === slug);
           return cheese ? [{ cheese, count: value.ratings.length, average: value.ratings.reduce((sum, rating) => sum + rating, 0) / value.ratings.length, lastTasted: value.lastTasted }] : [];
+        }));
+        setSavedCheeses((savedResult.data ?? []).flatMap((row) => {
+          const joined = row.cheeses as unknown as { slug: string } | null;
+          const cheese = joined?.slug ? catalog.find((item) => item.id === joined.slug) : null;
+          return cheese ? [cheese] : [];
         }));
         setLoading(false);
       });
@@ -506,11 +526,22 @@ function CellarScreen({ openCheese, catalog, userId, reload, onNotifications }: 
             <Rating value={entry.average} />
           </Pressable>
         ))}
-        {!loading && ((segment === 'Tasted' && !entries.length) || segment === 'Want to try') && (
+        {segment === 'Want to try' && savedCheeses.map((cheese) => (
+          <Pressable key={cheese.id} style={styles.cheeseRow} onPress={() => openCheese(cheese)}>
+            <CheeseArt name={cheese.name} color={cheese.color} size={70} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cheeseName}>{cheese.name}</Text>
+              <Text style={styles.cheeseMaker}>{cheese.creamery}</Text>
+              <Text style={styles.cheeseMeta}>{cheese.category} · {cheese.location}</Text>
+            </View>
+            <Ionicons name="bookmark" size={20} color={colors.wine} />
+          </Pressable>
+        ))}
+        {!loading && ((segment === 'Tasted' && !entries.length) || (segment === 'Want to try' && !savedCheeses.length)) && (
           <View style={styles.emptyState}>
             <Ionicons name={segment === 'Tasted' ? 'restaurant-outline' : 'bookmark-outline'} size={36} color={colors.sage} />
             <Text style={styles.emptyStateTitle}>{segment === 'Tasted' ? 'Your cellar is empty' : 'No saved cheeses yet'}</Text>
-            <Text style={styles.emptyStateCopy}>{segment === 'Tasted' ? 'Your first logged tasting will appear here with your personal stats.' : 'Saved-cheese syncing is coming next.'}</Text>
+            <Text style={styles.emptyStateCopy}>{segment === 'Tasted' ? 'Your first logged tasting will appear here with your personal stats.' : 'Tap the bookmark on any cheese to save it for later.'}</Text>
           </View>
         )}
         {loading && <ActivityIndicator color={colors.wine} />}
@@ -581,8 +612,44 @@ function ProfileScreen({ profile, signedIn, onManageCatalog, onNotifications }: 
   );
 }
 
-function CheeseModal({ cheese, onClose }: { cheese: Cheese | null; onClose: () => void }) {
+function CheeseModal({ cheese, userId, onSavedChange, onClose }: { cheese: Cheese | null; userId?: string; onSavedChange: () => void; onClose: () => void }) {
   const [saved, setSaved] = useState(false);
+  const [savingBookmark, setSavingBookmark] = useState(false);
+
+  useEffect(() => {
+    setSaved(false);
+    if (!supabase || !userId || !cheese) return;
+    supabase.from('cheeses').select('id').eq('slug', cheese.id).single().then(({ data }) => {
+      if (!data) return;
+      supabase!.from('saved_cheeses').select('cheese_id').eq('user_id', userId).eq('cheese_id', data.id).maybeSingle()
+        .then(({ data: savedRow }) => setSaved(Boolean(savedRow)));
+    });
+  }, [cheese?.id, userId]);
+
+  const toggleSaved = async () => {
+    if (!supabase || !userId || !cheese) {
+      Alert.alert('Sign in required', 'Create or sign in to an account to save cheeses for later.');
+      return;
+    }
+    setSavingBookmark(true);
+    const { data: catalogRow, error: catalogError } = await supabase.from('cheeses').select('id').eq('slug', cheese.id).single();
+    if (catalogError || !catalogRow) {
+      setSavingBookmark(false);
+      Alert.alert('Could not save cheese', catalogError?.message ?? 'Catalog entry was not found.');
+      return;
+    }
+    const { error } = saved
+      ? await supabase.from('saved_cheeses').delete().eq('user_id', userId).eq('cheese_id', catalogRow.id)
+      : await supabase.from('saved_cheeses').insert({ user_id: userId, cheese_id: catalogRow.id });
+    setSavingBookmark(false);
+    if (error) {
+      Alert.alert('Could not update saved cheeses', error.message);
+      return;
+    }
+    setSaved(!saved);
+    onSavedChange();
+  };
+
   if (!cheese) return null;
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -591,7 +658,9 @@ function CheeseModal({ cheese, onClose }: { cheese: Cheese | null; onClose: () =
           <View style={styles.modalHeader}>
             <Pressable style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
             <Brand compact />
-            <Pressable style={styles.modalButton} onPress={() => setSaved(!saved)}><Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={21} color={colors.wine} /></Pressable>
+            <Pressable style={styles.modalButton} disabled={savingBookmark} onPress={toggleSaved}>
+              {savingBookmark ? <ActivityIndicator size="small" color={colors.wine} /> : <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={21} color={colors.wine} />}
+            </Pressable>
           </View>
           <View style={[styles.detailHero, { backgroundColor: cheese.color }]}>
             <View style={styles.detailOrb} />
@@ -619,6 +688,8 @@ function CheeseModal({ cheese, onClose }: { cheese: Cheese | null; onClose: () =
             <View style={styles.detailNotes}>{cheese.pairings.map((pairing) => <View key={pairing} style={styles.pairingNote}><Text style={styles.pairingNoteText}>{pairing}</Text></View>)}</View>
           </View>
           <View style={styles.detailActions}>
+            <PrimaryButton label={saved ? 'Saved for later' : 'Save for later'} icon={saved ? 'bookmark' : 'bookmark-outline'} secondary onPress={toggleSaved} />
+            <View style={{ height: 10 }} />
             <PrimaryButton label="Log a tasting" icon="add-circle-outline" onPress={() => Alert.alert('Ready to taste', `Open the Log tab to record your ${cheese.name}.`)} />
           </View>
         </ScrollView>
@@ -709,6 +780,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
   const [catalog, setCatalog] = useState<Cheese[]>([]);
   const [feedPosts, setFeedPosts] = useState<Post[]>([]);
   const [feedReload, setFeedReload] = useState(0);
+  const [savedReload, setSavedReload] = useState(0);
   const [refreshingFeed, setRefreshingFeed] = useState(false);
   const [catalogManagementOpen, setCatalogManagementOpen] = useState(false);
   const [catalogReload, setCatalogReload] = useState(0);
@@ -786,7 +858,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
   const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} profile={profile} userId={userId} refreshing={refreshingFeed} onRefresh={() => setFeedReload((value) => value + 1)} onNotifications={openNotifications} />
     : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} onNotifications={openNotifications} />
     : tab === 'log' ? <LogScreen onComplete={() => { setFeedReload((value) => value + 1); setTab('feed'); }} catalog={catalog} userId={userId} onNotifications={openNotifications} />
-    : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} userId={userId} reload={feedReload} onNotifications={openNotifications} />
+    : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} userId={userId} reload={feedReload + savedReload} onNotifications={openNotifications} />
     : <ProfileScreen profile={profile} signedIn={signedIn} onManageCatalog={() => setCatalogManagementOpen(true)} onNotifications={openNotifications} />;
 
   return (
@@ -807,7 +879,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
           );
         })}
       </View>
-      <CheeseModal cheese={selectedCheese} onClose={() => setSelectedCheese(null)} />
+      <CheeseModal cheese={selectedCheese} userId={userId} onSavedChange={() => setSavedReload((value) => value + 1)} onClose={() => setSelectedCheese(null)} />
       {profile && userId && <CatalogManagement visible={catalogManagementOpen} role={profile.role} userId={userId} onClose={() => { setCatalogManagementOpen(false); setCatalogReload((value) => value + 1); }} />}
       <NotificationsModal visible={notificationsOpen} userId={userId} onClose={() => setNotificationsOpen(false)} />
     </SafeAreaView>
@@ -961,7 +1033,9 @@ const styles = StyleSheet.create({
   searchBox: { height: 52, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, marginTop: 9, ...shadow },
   searchInput: { flex: 1, paddingHorizontal: 10, color: colors.ink, fontSize: 14 },
   searchHint: { color: colors.muted, fontSize: 10, marginTop: 8, marginBottom: 10 },
-  cheesePickerResults: { gap: 8, maxHeight: 310 },
+  cheesePickerResults: { maxHeight: 225, marginBottom: 8 },
+  selectedCheeseSummary: { minHeight: 70, padding: 11, borderRadius: 17, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: 11, ...shadow },
+  changeCheese: { color: colors.wine, fontSize: 11, fontWeight: '800' },
   noSearchResults: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', paddingVertical: 18 },
   filterRow: { gap: 8, paddingVertical: 16 },
   filterPill: { paddingHorizontal: 15, height: 35, borderRadius: 18, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
