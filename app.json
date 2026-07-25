@@ -3,9 +3,15 @@
     "name": "By the Whey",
     "slug": "by-the-whey",
     "version": "0.1.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "bythewhey",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F6F0E3"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.thecurdnerd.bythewhey",
@@ -55,9 +61,12 @@
     },
     "android": {
       "package": "com.thecurdnerd.bythewhey",
+      "versionCode": 1,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#F6F0E3"
-      }
+      },
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "bundler": "metro"

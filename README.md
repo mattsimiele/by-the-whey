@@ -28,6 +28,10 @@ The script uses the bundled development runtime and installs anything missing au
 
 If Node.js and pnpm are installed globally, `pnpm install` followed by `pnpm start` works as well.
 
+## Android beta release
+
+Android EAS preview and production profiles, Play listing copy, Data Safety notes, content declarations, tester instructions, artwork, and the release runbook are ready. Start with [`docs/ANDROID_BETA_RELEASE.md`](docs/ANDROID_BETA_RELEASE.md).
+
 ## Product roles
 
 - **Turophile:** browse the approved catalog, log tastings, follow people, and interact with posts.
