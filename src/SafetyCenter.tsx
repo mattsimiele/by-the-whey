@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from './components';
@@ -146,11 +146,11 @@ export function SafetyCenter({ visible, userId, onClose }: { visible: boolean; u
             ['No harmful content', 'Threats, hate, sexual exploitation, scams, illegal sales, graphic violence, and coordinated abuse are not allowed.'],
             ['Report concerns', 'Use the report controls on posts, accounts, comments, and cheeses. Blocking immediately removes another account from your experience.'],
           ]} />}
-          {page === 'support' && <Policy title="Support" sections={[
-            ['Getting help', 'If something is not working, record what you were doing, your device type, and any error message. A public support contact and URL will be published before external beta testing.'],
+          {page === 'support' && <><Policy title="Support" sections={[
+            ['Getting help', 'If something is not working, record what you were doing, your device type, and any error message.'],
             ['Safety concerns', 'Use in-app reporting for content or behavior concerns. Urgent real-world emergencies should be directed to local emergency services.'],
             ['Account access', 'Use “Forgot password?” on the sign-in screen. Account deletion is available from the Safety tab on this page.'],
-          ]} />}
+          ]} /><Pressable style={styles.contact} onPress={() => Linking.openURL('mailto:support@thecurdnerd.com')}><Ionicons name="mail-outline" size={19} color={colors.wine} /><Text style={styles.contactText}>support@thecurdnerd.com</Text></Pressable><Pressable style={styles.contact} onPress={() => Linking.openURL('https://thecurdnerd.com')}><Ionicons name="globe-outline" size={19} color={colors.wine} /><Text style={styles.contactText}>thecurdnerd.com</Text></Pressable></>}
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -185,4 +185,6 @@ const styles = StyleSheet.create({
   blockHandle: { color: colors.muted, fontSize: 10, marginTop: 2 },
   unblock: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 13, backgroundColor: colors.blush },
   unblockText: { color: colors.wine, fontSize: 9, fontWeight: '800' },
+  contact: { minHeight: 52, borderRadius: 15, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, marginBottom: 9 },
+  contactText: { color: colors.wine, fontSize: 12, fontWeight: '800' },
 });

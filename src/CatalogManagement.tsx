@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from './components';
@@ -41,14 +41,16 @@ const emptyDraft: Draft = {
 
 type Submission = Draft & { id: string; slug: string; flavor_profile: string[]; pairings: string[]; profiles: { display_name: string; handle: string } };
 type Report = { id: string; target_type: string; target_id: string; reason: string; status: string; created_at: string; reporter_handle: string; target_preview: string | null };
+type PhotoReview = { id: string; storage_path: string; created_at: string; signed_url?: string; tasting: { notes: string; rating: number; visibility: string; profile: { display_name: string; handle: string } } };
 
 export function CatalogManagement({ visible, role, userId, onClose }: { visible: boolean; role: Role; userId: string; onClose: () => void }) {
-  const [tab, setTab] = useState<'submit' | 'review' | 'reports' | 'users'>(role === 'admin' ? 'review' : 'submit');
+  const [tab, setTab] = useState<'submit' | 'review' | 'photos' | 'reports' | 'users'>(role === 'admin' ? 'review' : 'submit');
   const [draft, setDraft] = useState(emptyDraft);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [saving, setSaving] = useState(false);
   const [accounts, setAccounts] = useState<{ id: string; display_name: string; handle: string; role: Role }[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [photos, setPhotos] = useState<PhotoReview[]>([]);
 
   const loadSubmissions = async () => {
     if (!supabase || role !== 'admin') return;
@@ -74,12 +76,27 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     setReports((data ?? []) as unknown as Report[]);
   };
 
+  const loadPhotos = async () => {
+    if (!supabase || role !== 'admin') return;
+    const { data, error } = await supabase.from('tasting_photos')
+      .select('id,storage_path,created_at,tasting:tasting_id(notes,rating,visibility,profile:user_id(display_name,handle))')
+      .eq('moderation_status', 'pending')
+      .order('created_at');
+    if (error) return Alert.alert('Could not load photo review', error.message);
+    const withUrls = await Promise.all((data ?? []).map(async (item) => {
+      const signed = await supabase!.storage.from('tasting-photos').createSignedUrl(item.storage_path, 1800);
+      return { ...item, signed_url: signed.data?.signedUrl };
+    }));
+    setPhotos(withUrls as unknown as PhotoReview[]);
+  };
+
   useEffect(() => {
     if (visible) {
       setTab(role === 'admin' ? 'review' : 'submit');
       loadSubmissions();
       loadAccounts();
       loadReports();
+      loadPhotos();
     }
   }, [visible, role]);
 
@@ -100,7 +117,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
       submitted_by: userId,
     });
     setSaving(false);
-    if (error) return Alert.alert('Could not submit cheese', error.message);
+    if (error) return Alert.alert(error.message.includes('CONTENT_REVIEW_REQUIRED') ? 'Submission needs revision' : 'Could not submit cheese', error.message.includes('CONTENT_REVIEW_REQUIRED') ? 'Please remove potentially harmful, explicit, or spam-like language and try again.' : error.message);
     setDraft(emptyDraft);
     Alert.alert('Submitted for review', 'An administrator can now review this cheese for publication.');
     if (role === 'admin') {
@@ -133,6 +150,20 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     setReports((current) => current.filter((report) => report.id !== id));
   };
 
+  const reviewPhoto = async (photo: PhotoReview, approve: boolean) => {
+    if (!supabase) return;
+    if (approve) {
+      const { error } = await supabase.from('tasting_photos').update({ moderation_status: 'approved', reviewed_by: userId, reviewed_at: new Date().toISOString() }).eq('id', photo.id);
+      if (error) return Alert.alert('Could not approve photo', error.message);
+    } else {
+      const { error: storageError } = await supabase.storage.from('tasting-photos').remove([photo.storage_path]);
+      if (storageError) return Alert.alert('Could not remove photo', storageError.message);
+      const { error } = await supabase.from('tasting_photos').delete().eq('id', photo.id);
+      if (error) return Alert.alert('Could not reject photo', error.message);
+    }
+    setPhotos((current) => current.filter((item) => item.id !== photo.id));
+  };
+
   const fields: { key: keyof Draft; label: string; placeholder: string; multiline?: boolean }[] = [
     { key: 'name', label: 'Cheese name', placeholder: 'Shelburne 2 Year' },
     { key: 'creamery_name', label: 'Creamery', placeholder: 'Shelburne Farms' },
@@ -159,7 +190,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
         </View>
         {role === 'admin' && (
           <View style={styles.tabs}>
-            {(['review', 'reports', 'submit', 'users'] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item === 'review' ? `Cheese (${submissions.length})` : item === 'reports' ? `Reports (${reports.length})` : item === 'submit' ? 'Add' : 'Users'}</Text></Pressable>)}
+            {(['review', 'photos', 'reports', 'submit', 'users'] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item === 'review' ? `Cheese ${submissions.length}` : item === 'photos' ? `Photos ${photos.length}` : item === 'reports' ? `Reports ${reports.length}` : item === 'submit' ? 'Add' : 'Users'}</Text></Pressable>)}
           </View>
         )}
         {tab === 'submit' ? (
@@ -186,6 +217,21 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
                 <View style={styles.actions}>
                   <Pressable onPress={() => review(item.id, false)} style={styles.reject}><Text style={styles.rejectText}>Return</Text></Pressable>
                   <Pressable onPress={() => review(item.id, true)} style={styles.approve}><Ionicons name="checkmark" size={17} color={colors.white} /><Text style={styles.approveText}>Publish</Text></Pressable>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        ) : tab === 'photos' ? (
+          <ScrollView contentContainerStyle={styles.content}>
+            {!photos.length ? <View style={styles.empty}><Ionicons name="images-outline" size={40} color={colors.sage} /><Text style={styles.emptyTitle}>Photo queue is clear</Text><Text style={styles.helper}>New tasting photos will remain off the public feed until approved.</Text></View> : photos.map((photo) => (
+              <View key={photo.id} style={styles.submission}>
+                {photo.signed_url ? <Image source={{ uri: photo.signed_url }} style={styles.reviewPhoto} /> : <View style={styles.photoUnavailable}><Ionicons name="image-outline" size={30} color={colors.muted} /></View>}
+                <Text style={styles.submissionTitle}>{photo.tasting.profile.display_name}</Text>
+                <Text style={styles.submitter}>@{photo.tasting.profile.handle} · {Number(photo.tasting.rating).toFixed(1)} stars · {photo.tasting.visibility}</Text>
+                <Text style={styles.story}>{photo.tasting.notes || 'No tasting notes.'}</Text>
+                <View style={styles.actions}>
+                  <Pressable onPress={() => reviewPhoto(photo, false)} style={styles.reject}><Text style={styles.rejectText}>Reject</Text></Pressable>
+                  <Pressable onPress={() => reviewPhoto(photo, true)} style={styles.approve}><Ionicons name="checkmark" size={17} color={colors.white} /><Text style={styles.approveText}>Approve</Text></Pressable>
                 </View>
               </View>
             ))}
@@ -250,6 +296,8 @@ const styles = StyleSheet.create({
   summary: { color: colors.muted, fontSize: 11, marginTop: 8 },
   story: { color: colors.ink, fontSize: 12, lineHeight: 18, marginTop: 12 },
   pills: { color: colors.wine, fontSize: 10, fontWeight: '700', marginTop: 11 },
+  reviewPhoto: { width: '100%', aspectRatio: 4 / 3, borderRadius: 14, marginBottom: 13, backgroundColor: colors.cream },
+  photoUnavailable: { width: '100%', aspectRatio: 4 / 3, borderRadius: 14, marginBottom: 13, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: 9, marginTop: 16 },
   reject: { flex: 1, height: 43, borderRadius: 13, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center' },
   rejectText: { color: colors.wine, fontWeight: '800', fontSize: 12 },

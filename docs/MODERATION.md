@@ -4,6 +4,8 @@
 
 - Every tasting and account can be reported from its feed menu.
 - Comments and catalog entries have their own report controls.
+- New tasting photos are hidden from other users until an administrator approves them.
+- Server-side text checks reject clearly harmful, explicit, or spam-like content before publication.
 - Blocking immediately removes the blocked account's activity and prevents interaction in both directions.
 - Users can manage and reverse their own blocks from Safety & Legal.
 - Users can delete their own tastings, comments, photos, and entire account.
@@ -11,6 +13,8 @@
 ## Report review
 
 Administrators review open reports in **Profile → Manage the community → Reports**. Each report includes its type, target identifier, reporter, reason, and date.
+
+Administrators review new photos in **Profile → Manage the community → Photos**. Approval makes a photo eligible for public feed display. Rejection deletes the stored photo and its database record while preserving the tasting.
 
 An administrator must inspect the referenced content and choose:
 

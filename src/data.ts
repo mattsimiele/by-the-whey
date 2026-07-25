@@ -33,4 +33,5 @@ export type Post = {
   likes: number;
   comments: number;
   photoUrl?: string;
+  photoPending?: boolean;
 };

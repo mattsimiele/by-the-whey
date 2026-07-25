@@ -70,11 +70,11 @@ Never place a service-role key or database password in the mobile app.
 - [ ] Support/contact page and public URL.
 - [x] Community guidelines.
 - [x] Photo/content moderation process.
-- [ ] Automated or pre-publication filtering for objectionable user content.
+- [x] Server-side text filtering and pre-publication admin review for uploaded photos.
 - [x] Profile and tasting visibility review.
 - [ ] Verify Sign in with Apple on a physical device with production Apple configuration and revoke Apple tokens during account deletion.
 
-The Privacy and Support pages now exist in-app, but their public URLs and final contact address must still be added before TestFlight/App Review. Sign in with Apple must be verified after the Apple Developer enrollment is active. See [`docs/MODERATION.md`](docs/MODERATION.md) for the operational moderation workflow.
+The support contact is `support@thecurdnerd.com`. The Privacy, Terms, Guidelines, and Support pages exist in-app, and deployment-ready HTML is in [`public-site/by-the-whey`](public-site/by-the-whey) for publication on `thecurdnerd.com`. Their final live URLs must be verified before TestFlight/App Review. Sign in with Apple must be verified after the Apple Developer enrollment is active. See [`docs/MODERATION.md`](docs/MODERATION.md) for the operational moderation workflow.
 
 ### Remaining product polish
 

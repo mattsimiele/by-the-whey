@@ -239,6 +239,7 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
                   <CheeseArt name={cheese.name} color={cheese.color} size={132} />
                 </>
               )}
+              {post.photoPending && <View style={styles.pendingPhotoBadge}><Ionicons name="time-outline" size={12} color={colors.white} /><Text style={styles.pendingPhotoText}>Visible to you · awaiting review</Text></View>}
               <View style={styles.artLabel}>
                 <Text style={styles.artLabelOverline}>{cheese.style.toUpperCase()}</Text>
                 <Text style={styles.artLabelTitle}>{cheese.name}</Text>
@@ -311,7 +312,7 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
     setSending(true);
     const { error } = await supabase.from('comments').insert({ tasting_id: post.id, user_id: userId, body: body.trim() });
     setSending(false);
-    if (error) return Alert.alert('Could not comment', error.message);
+    if (error) return Alert.alert(error.message.includes('CONTENT_REVIEW_REQUIRED') ? 'Comment needs revision' : 'Could not comment', error.message.includes('CONTENT_REVIEW_REQUIRED') ? 'Please remove potentially harmful, explicit, or spam-like language and try again.' : error.message);
     setBody('');
     load();
     onCommented();
@@ -498,7 +499,8 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, onNotifications
     }).select('id').single();
     if (error || !tasting) {
       setSaving(false);
-      Alert.alert('Could not log tasting', error?.message ?? 'The tasting record was not created.');
+      const filtered = error?.message.includes('CONTENT_REVIEW_REQUIRED');
+      Alert.alert(filtered ? 'Tasting needs revision' : 'Could not log tasting', filtered ? 'Please remove potentially harmful, explicit, or spam-like language and try again.' : error?.message ?? 'The tasting record was not created.');
       return;
     }
     if (photo) {
@@ -523,7 +525,7 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, onNotifications
       }
     }
     setSaving(false);
-    Alert.alert('Tasting logged', `${selected.name} has been added to your cheese diary${photo ? ' with your photo' : ''}${locationName.trim() ? ` at ${locationName.trim()}` : ''}${isPublic ? ' and shared with your circle' : ''}.`);
+    Alert.alert('Tasting logged', `${selected.name} has been added to your cheese diary${locationName.trim() ? ` at ${locationName.trim()}` : ''}${isPublic ? ' and shared with your circle' : ''}.${photo ? ' Your photo will appear publicly after an administrator approves it.' : ''}`);
     setNote('');
     setLocationName('');
     setPhoto(null);
@@ -1031,7 +1033,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
     setRefreshingFeed(true);
     supabase
       .from('tastings')
-      .select('id,rating,notes,location_name,created_at,user_id,cheese_id,profiles:user_id(display_name,handle,role),cheeses:cheese_id(slug,name),tasting_photos(storage_path),likes(count),comments(count)')
+      .select('id,rating,notes,location_name,created_at,user_id,cheese_id,profiles:user_id(display_name,handle,role),cheeses:cheese_id(slug,name),tasting_photos(storage_path,moderation_status),likes(count),comments(count)')
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
       .limit(30)
@@ -1045,7 +1047,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
         Promise.all(data.map(async (row) => {
           const author = row.profiles as unknown as { display_name: string; handle: string; role: Role };
           const cheese = row.cheeses as unknown as { slug: string; name: string };
-          const photos = row.tasting_photos as unknown as { storage_path: string }[];
+          const photos = row.tasting_photos as unknown as { storage_path: string; moderation_status: string }[];
           const likes = row.likes as unknown as { count: number }[];
           const comments = row.comments as unknown as { count: number }[];
           const signed = photos?.[0] ? await supabase!.storage.from('tasting-photos').createSignedUrl(photos[0].storage_path, 3600) : null;
@@ -1066,6 +1068,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
             likes: likes?.[0]?.count ?? 0,
             comments: comments?.[0]?.count ?? 0,
             photoUrl: signed?.data?.signedUrl,
+            photoPending: photos?.[0]?.moderation_status === 'pending',
           };
         })).then(setFeedPosts);
       });
@@ -1208,6 +1211,8 @@ const styles = StyleSheet.create({
   postMenu: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   featureArt: { height: 215, backgroundColor: '#E9DFC9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   postPhoto: { width: '100%', height: '100%', resizeMode: 'cover' },
+  pendingPhotoBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(75,30,42,0.9)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  pendingPhotoText: { color: colors.white, fontSize: 8, fontWeight: '800' },
   artGlow: { position: 'absolute', width: 270, height: 270, borderRadius: 150, backgroundColor: 'rgba(255,255,255,0.30)', top: -75, right: -20 },
   artLabel: { position: 'absolute', left: 18, bottom: 17, backgroundColor: 'rgba(255,252,246,0.93)', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
   artLabelOverline: { fontSize: 7, color: colors.wine, fontWeight: '900', letterSpacing: 1.3 },
