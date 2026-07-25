@@ -105,6 +105,14 @@ export function SafetyCenter({ visible, userId, onClose }: { visible: boolean; u
                       }
                     }
                   }
+                  const { data: profileData } = await supabase.from('profiles').select('avatar_path').eq('id', userId).single();
+                  if (profileData?.avatar_path) {
+                    const { error: avatarError } = await supabase.storage.from('profile-avatars').remove([profileData.avatar_path]);
+                    if (avatarError) {
+                      setDeleting(false);
+                      return Alert.alert('Could not remove profile photo', avatarError.message);
+                    }
+                  }
                   const { error } = await supabase.rpc('delete_my_account');
                   setDeleting(false);
                   if (error) return Alert.alert('Could not delete account', error.message);

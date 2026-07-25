@@ -78,14 +78,18 @@ The support contact is `support@thecurdnerd.com`. The Privacy, Terms, Guidelines
 
 ### Remaining product polish
 
-- Editable profiles and profile photos.
-- Calculated palate insights.
-- Public user profiles and follower/following management.
-- Tasting and comment editing.
-- Accurate live notification badges.
-- Real catalog photography and image moderation.
-- Robust loading, offline, and error states.
-- Multi-account iPhone and Android testing.
-- TestFlight/internal testing, App Store metadata, screenshots, privacy disclosures, and review submission.
+- [x] Editable profiles and profile photos.
+- [x] Public user profiles and follower/following management.
+- [x] Tasting editing, visibility changes, and photo replacement.
+- [x] Accurate live notification badges.
+- [x] Half-star rating selection.
+- [x] Discover sorting by rating, popularity, recency, and name.
+- [x] Core loading, retry, and empty states.
+- [ ] Calculated palate insights.
+- [ ] Comment editing.
+- [ ] Real catalog photography and image moderation.
+- [ ] Offline caching and deeper connection-loss recovery.
+- [ ] Multi-account iPhone and Android testing.
+- [ ] TestFlight/internal testing, App Store metadata, screenshots, privacy disclosures, and review submission.
 
 Monetization should follow product validation. Premium palate insights, producer/retailer profiles, affiliate storefront links, and tasteful sponsored discovery placements fit the concept better than an ad-heavy feed.

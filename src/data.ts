@@ -16,6 +16,7 @@ export type Cheese = {
   rating: number;
   logs: number;
   color: string;
+  createdAt: string;
 };
 
 export type Post = {
@@ -34,4 +35,5 @@ export type Post = {
   comments: number;
   photoUrl?: string;
   photoPending?: boolean;
+  avatarUrl?: string;
 };
