@@ -12,6 +12,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import { Brand, PrimaryButton } from './components';
 import { supabase } from './lib/supabase';
 import { colors, shadow } from './theme';
@@ -76,6 +78,53 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
     }
   };
 
+  const resetPassword = async () => {
+    if (!supabase || !email.trim()) {
+      Alert.alert('Add your email', 'Enter the email address for your account first.');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: 'bythewhey://reset-password',
+    });
+    Alert.alert(
+      error ? 'Could not send reset email' : 'Check your inbox',
+      error?.message ?? 'We sent a secure password-reset link to your email address.',
+    );
+  };
+
+  const signInWithApple = async () => {
+    if (!supabase) return;
+    setBusy(true);
+    try {
+      const nonce = Crypto.randomUUID();
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce,
+      });
+      if (!credential.identityToken) throw new Error('Apple did not return an identity token.');
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+        nonce,
+      });
+      if (error) throw error;
+      const fullName = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ');
+      if (fullName && data.user) {
+        await supabase.auth.updateUser({ data: { display_name: fullName, full_name: fullName } });
+        await supabase.from('profiles').update({ display_name: fullName }).eq('id', data.user.id);
+      }
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Apple Sign-In failed', error instanceof Error ? error.message : 'Please try again.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -129,6 +178,19 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
               <PrimaryButton label={mode === 'signUp' ? 'Join the cheese table' : 'Sign in'} icon="arrow-forward" onPress={submit} />
             )}
           </View>
+          {mode === 'signIn' && <Pressable onPress={resetPassword} style={styles.forgot}><Text style={styles.forgotText}>Forgot password?</Text></Pressable>}
+          {Platform.OS === 'ios' && (
+            <>
+              <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>OR</Text><View style={styles.orLine} /></View>
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={14}
+                style={styles.appleButton}
+                onPress={signInWithApple}
+              />
+            </>
+          )}
           <Text style={styles.terms}>By continuing, you agree to our Terms of Use and Privacy Policy.</Text>
         </View>
 
@@ -164,6 +226,12 @@ const styles = StyleSheet.create({
   submit: { marginTop: 20 },
   loading: { height: 52, alignItems: 'center', justifyContent: 'center' },
   terms: { color: colors.muted, fontSize: 8, lineHeight: 13, textAlign: 'center', marginTop: 12 },
+  forgot: { alignSelf: 'center', padding: 10 },
+  forgotText: { color: colors.wine, fontSize: 11, fontWeight: '800' },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 },
+  orLine: { flex: 1, height: 1, backgroundColor: colors.line },
+  orText: { color: colors.muted, fontSize: 8, fontWeight: '800' },
+  appleButton: { width: '100%', height: 50 },
   guest: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 20, padding: 10 },
   guestText: { color: colors.wine, fontSize: 12, fontWeight: '800' },
 });

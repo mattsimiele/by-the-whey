@@ -5,3 +5,5 @@ web-build/
 .env
 *.log
 .DS_Store
+outputs/**/*.png
+outputs/**/*.inspect.ndjson

@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -18,7 +20,10 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import type { Session } from '@supabase/supabase-js';
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 import { AuthScreen } from './src/AuthScreen';
+import { CatalogManagement } from './src/CatalogManagement';
 import { Brand, CheeseArt, PrimaryButton, Rating, SectionHeader } from './src/components';
 import { Cheese, cheeses, posts as seedPosts, Role } from './src/data';
 import { isSupabaseConfigured, supabase } from './src/lib/supabase';
@@ -35,7 +40,7 @@ const tabItems: { id: Tab; label: string; icon: keyof typeof Ionicons.glyphMap; 
   { id: 'profile', label: 'Profile', icon: 'person-outline', active: 'person' },
 ];
 
-function AppHeader({ title, subtitle }: { title?: string; subtitle?: string }) {
+function AppHeader({ title, subtitle, onNotifications }: { title?: string; subtitle?: string; onNotifications?: () => void }) {
   return (
     <View style={styles.header}>
       {title ? (
@@ -44,7 +49,7 @@ function AppHeader({ title, subtitle }: { title?: string; subtitle?: string }) {
           <Text style={styles.pageTitle}>{title}</Text>
         </View>
       ) : <Brand compact />}
-      <Pressable style={styles.headerAction}>
+      <Pressable style={styles.headerAction} onPress={onNotifications}>
         <Ionicons name="notifications-outline" size={21} color={colors.ink} />
         <View style={styles.notificationDot} />
       </Pressable>
@@ -52,8 +57,10 @@ function AppHeader({ title, subtitle }: { title?: string; subtitle?: string }) {
   );
 }
 
-function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefresh }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; feedPosts: typeof seedPosts; userId?: string; refreshing: boolean; onRefresh: () => void }) {
+function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefresh, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; feedPosts: typeof seedPosts; userId?: string; refreshing: boolean; onRefresh: () => void; onNotifications: () => void }) {
   const [liked, setLiked] = useState<string[]>([]);
+  const [following, setFollowing] = useState<string[]>([]);
+  const [commentPost, setCommentPost] = useState<(typeof seedPosts)[number] | null>(null);
 
   return (
     <ScrollView
@@ -61,7 +68,7 @@ function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefr
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.wine} colors={[colors.wine]} />}
     >
-      <AppHeader />
+      <AppHeader onNotifications={onNotifications} />
       <View style={styles.welcomeRow}>
         <View>
           <Text style={styles.eyebrow}>SATURDAY, JULY 25</Text>
@@ -104,11 +111,29 @@ function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefr
                 </View>
                 <Text style={styles.postMeta}>{post.handle} · {post.time}</Text>
               </View>
+              {userId && post.userId && post.userId !== userId && (
+                <Pressable onPress={async () => {
+                  if (!supabase) return;
+                  const isFollowing = following.includes(post.userId!);
+                  const action = isFollowing
+                    ? supabase.from('follows').delete().eq('follower_id', userId).eq('following_id', post.userId!)
+                    : supabase.from('follows').upsert({ follower_id: userId, following_id: post.userId! });
+                  const { error } = await action;
+                  if (error) return Alert.alert('Could not update follow', error.message);
+                  setFollowing((current) => isFollowing ? current.filter((id) => id !== post.userId) : [...current, post.userId!]);
+                }} style={styles.followButton}>
+                  <Text style={styles.followText}>{following.includes(post.userId) ? 'Following' : 'Follow'}</Text>
+                </Pressable>
+              )}
               <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
             </View>
             <Pressable style={styles.featureArt} onPress={() => openCheese(cheese)}>
-              <View style={styles.artGlow} />
-              <CheeseArt name={cheese.name} color={cheese.color} size={132} />
+              {post.photoUrl ? <Image source={{ uri: post.photoUrl }} style={styles.postPhoto} /> : (
+                <>
+                  <View style={styles.artGlow} />
+                  <CheeseArt name={cheese.name} color={cheese.color} size={132} />
+                </>
+              )}
               <View style={styles.artLabel}>
                 <Text style={styles.artLabelOverline}>{cheese.style.toUpperCase()}</Text>
                 <Text style={styles.artLabelTitle}>{cheese.name}</Text>
@@ -145,10 +170,10 @@ function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefr
                   <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={21} color={isLiked ? colors.wine : colors.ink} />
                   <Text style={[styles.socialText, isLiked && { color: colors.wine }]}>{post.likes + (isLiked ? 1 : 0)}</Text>
                 </Pressable>
-                <View style={styles.socialAction}>
+                <Pressable style={styles.socialAction} onPress={() => post.id.includes('-') ? setCommentPost(post) : Alert.alert('Prototype post', 'Comments are available on live community tastings.')}>
                   <Ionicons name="chatbubble-outline" size={19} color={colors.ink} />
                   <Text style={styles.socialText}>{post.comments}</Text>
-                </View>
+                </Pressable>
                 <View style={{ flex: 1 }} />
                 <Ionicons name="share-outline" size={20} color={colors.ink} />
               </View>
@@ -156,11 +181,67 @@ function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefr
           </View>
         );
       })}
+      <CommentsModal post={commentPost} userId={userId} onClose={() => setCommentPost(null)} />
     </ScrollView>
   );
 }
 
-function DiscoverScreen({ openCheese, catalog }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[] }) {
+function CommentsModal({ post, userId, onClose }: { post: (typeof seedPosts)[number] | null; userId?: string; onClose: () => void }) {
+  const [comments, setComments] = useState<{ id: string; body: string; created_at: string; profiles: { display_name: string; handle: string } }[]>([]);
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const load = async () => {
+    if (!supabase || !post) return;
+    const { data } = await supabase.from('comments').select('id,body,created_at,profiles:user_id(display_name,handle)').eq('tasting_id', post.id).order('created_at');
+    setComments((data ?? []) as unknown as typeof comments);
+  };
+
+  useEffect(() => { load(); }, [post?.id]);
+
+  const send = async () => {
+    if (!supabase || !post || !userId || !body.trim()) return;
+    setSending(true);
+    const { error } = await supabase.from('comments').insert({ tasting_id: post.id, user_id: userId, body: body.trim() });
+    setSending(false);
+    if (error) return Alert.alert('Could not comment', error.message);
+    setBody('');
+    load();
+  };
+
+  return (
+    <Modal visible={Boolean(post)} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={styles.commentsPage}>
+        <View style={styles.commentsHeader}>
+          <Pressable style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
+          <Text style={styles.commentsTitle}>Tasting conversation</Text>
+          <View style={{ width: 38 }} />
+        </View>
+        <ScrollView contentContainerStyle={styles.commentsList}>
+          {comments.length ? comments.map((comment) => (
+            <View key={comment.id} style={styles.commentRow}>
+              <View style={styles.commentAvatar}><Text style={styles.commentAvatarText}>{comment.profiles.display_name.charAt(0)}</Text></View>
+              <View style={styles.commentBubble}>
+                <Text style={styles.commentName}>{comment.profiles.display_name} <Text style={styles.commentHandle}>@{comment.profiles.handle}</Text></Text>
+                <Text style={styles.commentBody}>{comment.body}</Text>
+              </View>
+            </View>
+          )) : <Text style={styles.emptyComments}>Start the conversation about this tasting.</Text>}
+        </ScrollView>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.commentComposer}>
+            <TextInput value={body} onChangeText={setBody} placeholder="Add a thoughtful comment…" placeholderTextColor="#9B958A" style={styles.commentInput} multiline />
+            <Pressable onPress={send} disabled={sending || !body.trim()} style={styles.commentSend}>
+              {sending ? <ActivityIndicator size="small" color={colors.white} /> : <Ionicons name="arrow-up" size={20} color={colors.white} />}
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+function DiscoverScreen({ openCheese, catalog, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; onNotifications: () => void }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
   const filters = ['All', 'Cow', 'Goat', 'Blue', 'Washed rind'];
@@ -172,7 +253,7 @@ function DiscoverScreen({ openCheese, catalog }: { openCheese: (cheese: Cheese) 
 
   return (
     <ScrollView contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled">
-      <AppHeader title="Discover" subtitle="FIND YOUR NEXT FAVORITE" />
+      <AppHeader title="Discover" subtitle="FIND YOUR NEXT FAVORITE" onNotifications={onNotifications} />
       <View style={styles.searchBox}>
         <Ionicons name="search" size={20} color={colors.muted} />
         <TextInput value={query} onChangeText={setQuery} placeholder="Cheese, maker, region…" placeholderTextColor="#9B958A" style={styles.searchInput} />
@@ -224,12 +305,32 @@ function DiscoverScreen({ openCheese, catalog }: { openCheese: (cheese: Cheese) 
   );
 }
 
-function LogScreen({ onComplete, catalog, userId }: { onComplete: () => void; catalog: Cheese[]; userId?: string }) {
+function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplete: () => void; catalog: Cheese[]; userId?: string; onNotifications: () => void }) {
   const [selected, setSelected] = useState<Cheese>(catalog[0] ?? cheeses[0]!);
   const [rating, setRating] = useState(4.5);
   const [note, setNote] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [photo, setPhoto] = useState<{ uri: string; base64: string; mimeType: string } | null>(null);
+
+  const pickPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Photo permission needed', 'Allow photo access to add an image to your tasting.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+      base64: true,
+    });
+    const asset = result.assets?.[0];
+    if (!result.canceled && asset?.base64) {
+      setPhoto({ uri: asset.uri, base64: asset.base64, mimeType: asset.mimeType ?? 'image/jpeg' });
+    }
+  };
 
   const submit = async () => {
     if (!supabase || !userId) {
@@ -248,13 +349,29 @@ function LogScreen({ onComplete, catalog, userId }: { onComplete: () => void; ca
       Alert.alert('Catalog entry required', 'This prototype cheese is not published in the shared catalog yet.');
       return;
     }
-    const { error } = await supabase.from('tastings').insert({
+    const { data: tasting, error } = await supabase.from('tastings').insert({
       user_id: userId,
       cheese_id: cheese.id,
       rating,
       notes: note.trim(),
       visibility: isPublic ? 'public' : 'private',
-    });
+    }).select('id').single();
+    if (!error && tasting && photo) {
+      const extension = photo.mimeType.includes('png') ? 'png' : photo.mimeType.includes('webp') ? 'webp' : 'jpg';
+      const storagePath = `${userId}/${tasting.id}/${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from('tasting-photos')
+        .upload(storagePath, decode(photo.base64), { contentType: photo.mimeType, upsert: false });
+      if (uploadError) {
+        setSaving(false);
+        Alert.alert('Tasting saved without photo', uploadError.message);
+        setNote('');
+        setPhoto(null);
+        onComplete();
+        return;
+      }
+      await supabase.from('tasting_photos').insert({ tasting_id: tasting.id, storage_path: storagePath });
+    }
     setSaving(false);
     if (error) {
       Alert.alert('Could not log tasting', error.message);
@@ -262,13 +379,14 @@ function LogScreen({ onComplete, catalog, userId }: { onComplete: () => void; ca
     }
     Alert.alert('Tasting logged', `${selected.name} has been added to your cheese diary${isPublic ? ' and shared with your circle' : ''}.`);
     setNote('');
+    setPhoto(null);
     onComplete();
   };
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled">
-        <AppHeader title="Log a tasting" subtitle="CAPTURE THE MOMENT" />
+        <AppHeader title="Log a tasting" subtitle="CAPTURE THE MOMENT" onNotifications={onNotifications} />
         <Text style={styles.fieldLabel}>WHAT ARE YOU TASTING?</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 8 }}>
           {catalog.map((cheese) => (
@@ -307,7 +425,11 @@ function LogScreen({ onComplete, catalog, userId }: { onComplete: () => void; ca
         </View>
 
         <View style={styles.addOns}>
-          <View style={styles.addOn}><Ionicons name="camera-outline" size={21} color={colors.wine} /><Text style={styles.addOnText}>Add photos</Text><Ionicons name="chevron-forward" size={17} color={colors.muted} /></View>
+          <Pressable style={styles.addOn} onPress={pickPhoto}>
+            {photo ? <Image source={{ uri: photo.uri }} style={styles.photoThumb} /> : <Ionicons name="camera-outline" size={21} color={colors.wine} />}
+            <View style={{ flex: 1 }}><Text style={styles.addOnText}>{photo ? 'Photo selected' : 'Add photo'}</Text>{photo && <Text style={styles.addOnSub}>Tap to choose a different image</Text>}</View>
+            <Ionicons name="chevron-forward" size={17} color={colors.muted} />
+          </Pressable>
           <View style={styles.addOn}><Ionicons name="location-outline" size={21} color={colors.wine} /><Text style={styles.addOnText}>Add location</Text><Ionicons name="chevron-forward" size={17} color={colors.muted} /></View>
           <Pressable style={styles.addOn} onPress={() => setIsPublic(!isPublic)}>
             <Ionicons name={isPublic ? 'people-outline' : 'lock-closed-outline'} size={21} color={colors.wine} />
@@ -321,12 +443,12 @@ function LogScreen({ onComplete, catalog, userId }: { onComplete: () => void; ca
   );
 }
 
-function CellarScreen({ openCheese, catalog }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[] }) {
+function CellarScreen({ openCheese, catalog, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; onNotifications: () => void }) {
   const [segment, setSegment] = useState<'Tasted' | 'Want to try'>('Tasted');
   const list = segment === 'Tasted' ? catalog.slice(0, 4) : catalog.slice(3);
   return (
     <ScrollView contentContainerStyle={styles.screenContent}>
-      <AppHeader title="My cellar" subtitle="YOUR CHEESE JOURNEY" />
+      <AppHeader title="My cellar" subtitle="YOUR CHEESE JOURNEY" onNotifications={onNotifications} />
       <View style={styles.cellarSummary}>
         <View><Text style={styles.summaryNumber}>28</Text><Text style={styles.summaryLabel}>TASTED</Text></View>
         <View style={styles.summaryDivider} />
@@ -358,13 +480,13 @@ function CellarScreen({ openCheese, catalog }: { openCheese: (cheese: Cheese) =>
   );
 }
 
-function ProfileScreen({ profile, signedIn }: { profile: UserProfile | null; signedIn: boolean }) {
+function ProfileScreen({ profile, signedIn, onManageCatalog, onNotifications }: { profile: UserProfile | null; signedIn: boolean; onManageCatalog: () => void; onNotifications: () => void }) {
   const role = profile?.role ?? 'turophile';
   const displayName = profile?.display_name ?? 'Guest Turophile';
   const initials = displayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'BT';
   return (
     <ScrollView contentContainerStyle={styles.screenContent}>
-      <AppHeader />
+      <AppHeader onNotifications={onNotifications} />
       <View style={styles.profileHero}>
         <View style={styles.profileAvatar}><Text style={styles.profileInitials}>{initials}</Text></View>
         <Text style={styles.profileName}>{displayName}</Text>
@@ -391,14 +513,14 @@ function ProfileScreen({ profile, signedIn }: { profile: UserProfile | null; sig
       <SectionHeader title="Account access" />
       <Text style={styles.roleHelper}>Your role is secured by Supabase and can only be changed by an administrator.</Text>
       {role !== 'turophile' && (
-        <View style={styles.rolePanel}>
+        <Pressable style={styles.rolePanel} onPress={onManageCatalog}>
           <Ionicons name={role === 'admin' ? 'settings-outline' : 'add-circle-outline'} size={24} color={colors.wine} />
           <View style={{ flex: 1 }}>
             <Text style={styles.rolePanelTitle}>{role === 'admin' ? 'Manage the community' : 'Contribute to the catalog'}</Text>
             <Text style={styles.rolePanelCopy}>{role === 'admin' ? 'Review cheese submissions, moderate reports, and manage accounts.' : 'Submit missing cheeses and track their review status.'}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.wine} />
-        </View>
+        </Pressable>
       )}
       {signedIn && <View style={{ marginTop: 18 }}><PrimaryButton label="Sign out" icon="log-out-outline" secondary onPress={() => supabase?.auth.signOut()} /></View>}
     </ScrollView>
@@ -451,6 +573,82 @@ function CheeseModal({ cheese, onClose }: { cheese: Cheese | null; onClose: () =
   );
 }
 
+function NotificationsModal({ visible, userId, onClose }: { visible: boolean; userId?: string; onClose: () => void }) {
+  const [items, setItems] = useState<{ id: string; kind: string; read_at: string | null; created_at: string; actor: { display_name: string; handle: string } | null }[]>([]);
+
+  useEffect(() => {
+    if (!visible || !supabase || !userId) return;
+    supabase.from('notifications').select('id,kind,read_at,created_at,actor:actor_id(display_name,handle)').eq('user_id', userId).order('created_at', { ascending: false }).limit(50)
+      .then(({ data }) => setItems((data ?? []) as unknown as typeof items));
+  }, [visible, userId]);
+
+  const markAllRead = async () => {
+    if (!supabase || !userId) return;
+    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', userId).is('read_at', null);
+    setItems((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() })));
+  };
+
+  const message = (item: typeof items[number]) => {
+    const name = item.actor?.display_name ?? 'Someone';
+    if (item.kind === 'follow') return `${name} followed you.`;
+    if (item.kind === 'like') return `${name} liked your tasting.`;
+    if (item.kind === 'comment') return `${name} commented on your tasting.`;
+    if (item.kind === 'cheese_approved') return 'Your cheese submission was approved.';
+    return 'Your cheese submission needs revision.';
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={styles.commentsPage}>
+        <View style={styles.commentsHeader}>
+          <Pressable style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
+          <Text style={styles.commentsTitle}>Notifications</Text>
+          <Pressable onPress={markAllRead}><Text style={styles.markRead}>Read all</Text></Pressable>
+        </View>
+        <ScrollView contentContainerStyle={styles.notificationList}>
+          {items.length ? items.map((item) => (
+            <View key={item.id} style={[styles.notificationItem, !item.read_at && styles.notificationUnread]}>
+              <View style={styles.notificationIcon}><Ionicons name={item.kind === 'follow' ? 'person-add-outline' : item.kind === 'comment' ? 'chatbubble-outline' : 'heart-outline'} size={19} color={colors.wine} /></View>
+              <View style={{ flex: 1 }}><Text style={styles.notificationText}>{message(item)}</Text><Text style={styles.notificationTime}>{new Date(item.created_at).toLocaleDateString()}</Text></View>
+              {!item.read_at && <View style={styles.unreadDot} />}
+            </View>
+          )) : <View style={styles.emptyNotification}><Ionicons name="notifications-outline" size={39} color={colors.sage} /><Text style={styles.emptyNotificationTitle}>All quiet at the cheese table</Text><Text style={styles.emptyComments}>New follows, likes, and comments will appear here.</Text></View>}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+function PasswordResetModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [saving, setSaving] = useState(false);
+  const update = async () => {
+    if (!supabase || password.length < 8 || password !== confirm) {
+      return Alert.alert('Check your password', 'Use at least 8 characters and make sure both entries match.');
+    }
+    setSaving(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    setSaving(false);
+    if (error) return Alert.alert('Could not update password', error.message);
+    setPassword('');
+    setConfirm('');
+    Alert.alert('Password updated', 'Your new password is ready to use.', [{ text: 'Done', onPress: onClose }]);
+  };
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+      <SafeAreaView style={styles.resetPage}>
+        <View style={styles.resetIcon}><Ionicons name="key-outline" size={30} color={colors.wine} /></View>
+        <Text style={styles.resetTitle}>Choose a new password</Text>
+        <Text style={styles.resetCopy}>Use at least eight characters. A longer, unique password is best.</Text>
+        <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="New password" placeholderTextColor="#9B958A" style={styles.resetInput} />
+        <TextInput value={confirm} onChangeText={setConfirm} secureTextEntry placeholder="Confirm password" placeholderTextColor="#9B958A" style={styles.resetInput} />
+        {saving ? <ActivityIndicator color={colors.wine} /> : <PrimaryButton label="Update password" icon="checkmark-circle-outline" onPress={update} />}
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
 function Root({ profile, signedIn, userId }: { profile: UserProfile | null; signedIn: boolean; userId?: string }) {
   const [tab, setTab] = useState<Tab>('feed');
   const [selectedCheese, setSelectedCheese] = useState<Cheese | null>(null);
@@ -458,6 +656,10 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
   const [feedPosts, setFeedPosts] = useState(seedPosts);
   const [feedReload, setFeedReload] = useState(0);
   const [refreshingFeed, setRefreshingFeed] = useState(false);
+  const [catalogManagementOpen, setCatalogManagementOpen] = useState(false);
+  const [catalogReload, setCatalogReload] = useState(0);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const openNotifications = () => signedIn ? setNotificationsOpen(true) : Alert.alert('Sign in required', 'Create an account to receive community notifications.');
 
   useEffect(() => {
     if (!supabase) return;
@@ -482,14 +684,14 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
       const liveSlugs = new Set(live.map((item) => item.id));
       setCatalog([...live, ...cheeses.filter((item) => !liveSlugs.has(item.id))]);
     });
-  }, []);
+  }, [catalogReload]);
 
   useEffect(() => {
     if (!supabase || tab !== 'feed') return;
     setRefreshingFeed(true);
     supabase
       .from('tastings')
-      .select('id,rating,notes,location_name,created_at,user_id,cheese_id,profiles:user_id(display_name,handle,role),cheeses:cheese_id(slug,name)')
+      .select('id,rating,notes,location_name,created_at,user_id,cheese_id,profiles:user_id(display_name,handle,role),cheeses:cheese_id(slug,name),tasting_photos(storage_path)')
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
       .limit(30)
@@ -500,9 +702,11 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
           setFeedPosts(seedPosts);
           return;
         }
-        const livePosts = data.map((row) => {
+        Promise.all(data.map(async (row) => {
           const author = row.profiles as unknown as { display_name: string; handle: string; role: Role };
           const cheese = row.cheeses as unknown as { slug: string; name: string };
+          const photos = row.tasting_photos as unknown as { storage_path: string }[];
+          const signed = photos?.[0] ? await supabase!.storage.from('tasting-photos').createSignedUrl(photos[0].storage_path, 3600) : null;
           const initials = author.display_name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
           const minutes = Math.max(1, Math.round((Date.now() - new Date(row.created_at).getTime()) / 60000));
           return {
@@ -511,6 +715,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
             handle: `@${author.handle}`,
             initials,
             role: author.role,
+            userId: row.user_id,
             cheeseId: cheese.slug,
             rating: Number(row.rating),
             note: row.notes || `Tasted ${cheese.name}.`,
@@ -518,17 +723,17 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
             time: minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h`,
             likes: 0,
             comments: 0,
+            photoUrl: signed?.data?.signedUrl,
           };
-        });
-        setFeedPosts([...livePosts, ...seedPosts]);
+        })).then((livePosts) => setFeedPosts([...livePosts, ...seedPosts]));
       });
   }, [tab, feedReload]);
 
-  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} userId={userId} refreshing={refreshingFeed} onRefresh={() => setFeedReload((value) => value + 1)} />
-    : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} />
-    : tab === 'log' ? <LogScreen onComplete={() => { setFeedReload((value) => value + 1); setTab('feed'); }} catalog={catalog} userId={userId} />
-    : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} />
-    : <ProfileScreen profile={profile} signedIn={signedIn} />;
+  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} userId={userId} refreshing={refreshingFeed} onRefresh={() => setFeedReload((value) => value + 1)} onNotifications={openNotifications} />
+    : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} onNotifications={openNotifications} />
+    : tab === 'log' ? <LogScreen onComplete={() => { setFeedReload((value) => value + 1); setTab('feed'); }} catalog={catalog} userId={userId} onNotifications={openNotifications} />
+    : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} onNotifications={openNotifications} />
+    : <ProfileScreen profile={profile} signedIn={signedIn} onManageCatalog={() => setCatalogManagementOpen(true)} onNotifications={openNotifications} />;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -549,6 +754,8 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
         })}
       </View>
       <CheeseModal cheese={selectedCheese} onClose={() => setSelectedCheese(null)} />
+      {profile && userId && <CatalogManagement visible={catalogManagementOpen} role={profile.role} userId={userId} onClose={() => { setCatalogManagementOpen(false); setCatalogReload((value) => value + 1); }} />}
+      <NotificationsModal visible={notificationsOpen} userId={userId} onClose={() => setNotificationsOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -558,6 +765,7 @@ export default function App() {
   const [loadingSession, setLoadingSession] = useState(true);
   const [guest, setGuest] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -568,12 +776,29 @@ export default function App() {
       setSession(data.session);
       setLoadingSession(false);
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       if (nextSession) setGuest(false);
       if (!nextSession) setProfile(null);
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
     });
     return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const handleUrl = async (url: string) => {
+      const parameters = new URLSearchParams(url.split('#')[1] ?? url.split('?')[1] ?? '');
+      const accessToken = parameters.get('access_token');
+      const refreshToken = parameters.get('refresh_token');
+      if (accessToken && refreshToken) {
+        const { error } = await supabase!.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        if (!error && parameters.get('type') === 'recovery') setPasswordRecovery(true);
+      }
+    };
+    Linking.getInitialURL().then((url) => { if (url) return handleUrl(url); });
+    const listener = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    return () => listener.remove();
   }, []);
 
   useEffect(() => {
@@ -594,6 +819,7 @@ export default function App() {
       ) : (
         <AuthScreen onGuest={() => setGuest(true)} />
       )}
+      <PasswordResetModal visible={passwordRecovery} onClose={() => setPasswordRecovery(false)} />
     </SafeAreaProvider>
   );
 }
@@ -601,6 +827,11 @@ export default function App() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper },
   authLoading: { flex: 1, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  resetPage: { flex: 1, backgroundColor: colors.paper, padding: 25, justifyContent: 'center' },
+  resetIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
+  resetTitle: { color: colors.ink, fontSize: 25, fontWeight: '800', textAlign: 'center', marginTop: 18 },
+  resetCopy: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', marginVertical: 10 },
+  resetInput: { height: 50, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, borderRadius: 14, paddingHorizontal: 14, color: colors.ink, marginBottom: 10 },
   app: { flex: 1 },
   screenContent: { paddingHorizontal: 20, paddingBottom: 28, gap: 0 },
   header: { height: 70, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -629,7 +860,10 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   postName: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   postMeta: { color: colors.muted, fontSize: 11, marginTop: 2 },
+  followButton: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.blush, borderRadius: 12 },
+  followText: { color: colors.wine, fontSize: 9, fontWeight: '800' },
   featureArt: { height: 215, backgroundColor: '#E9DFC9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  postPhoto: { width: '100%', height: '100%', resizeMode: 'cover' },
   artGlow: { position: 'absolute', width: 270, height: 270, borderRadius: 150, backgroundColor: 'rgba(255,255,255,0.30)', top: -75, right: -20 },
   artLabel: { position: 'absolute', left: 18, bottom: 17, backgroundColor: 'rgba(255,252,246,0.93)', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
   artLabelOverline: { fontSize: 7, color: colors.wine, fontWeight: '900', letterSpacing: 1.3 },
@@ -645,6 +879,31 @@ const styles = StyleSheet.create({
   socialRow: { borderTopWidth: 1, borderTopColor: colors.line, marginTop: 14, paddingTop: 13, flexDirection: 'row', alignItems: 'center', gap: 22 },
   socialAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   socialText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  commentsPage: { flex: 1, backgroundColor: colors.paper },
+  commentsHeader: { height: 64, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.line },
+  commentsTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  commentsList: { padding: 18, gap: 14, flexGrow: 1 },
+  commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  commentAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.wine, alignItems: 'center', justifyContent: 'center' },
+  commentAvatarText: { color: colors.white, fontWeight: '800' },
+  commentBubble: { flex: 1, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 15, padding: 12 },
+  commentName: { color: colors.ink, fontWeight: '800', fontSize: 11 },
+  commentHandle: { color: colors.muted, fontWeight: '500' },
+  commentBody: { color: colors.ink, fontSize: 13, lineHeight: 19, marginTop: 5 },
+  emptyComments: { color: colors.muted, textAlign: 'center', marginTop: 60, fontSize: 13 },
+  commentComposer: { padding: 12, borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'flex-end', gap: 9 },
+  commentInput: { flex: 1, minHeight: 45, maxHeight: 100, backgroundColor: colors.cream, borderRadius: 15, paddingHorizontal: 13, paddingVertical: 12, color: colors.ink },
+  commentSend: { width: 43, height: 43, borderRadius: 22, backgroundColor: colors.wine, alignItems: 'center', justifyContent: 'center' },
+  markRead: { color: colors.wine, fontSize: 10, fontWeight: '800' },
+  notificationList: { padding: 16, gap: 9, flexGrow: 1 },
+  notificationItem: { minHeight: 70, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 17, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  notificationUnread: { backgroundColor: colors.blush },
+  notificationIcon: { width: 39, height: 39, borderRadius: 20, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
+  notificationText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  notificationTime: { color: colors.muted, fontSize: 9, marginTop: 4 },
+  unreadDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.wine },
+  emptyNotification: { alignItems: 'center', paddingTop: 80 },
+  emptyNotificationTitle: { color: colors.ink, fontSize: 18, fontWeight: '800', marginTop: 12 },
   searchBox: { height: 52, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, marginTop: 9, ...shadow },
   searchInput: { flex: 1, paddingHorizontal: 10, color: colors.ink, fontSize: 14 },
   filterRow: { gap: 8, paddingVertical: 16 },
@@ -682,6 +941,7 @@ const styles = StyleSheet.create({
   addOn: { minHeight: 55, borderBottomWidth: 1, borderBottomColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: 12 },
   addOnText: { flex: 1, color: colors.ink, fontWeight: '700', fontSize: 13 },
   addOnSub: { color: colors.muted, fontSize: 9, marginTop: 2 },
+  photoThumb: { width: 38, height: 38, borderRadius: 10 },
   switch: { width: 40, height: 23, borderRadius: 13, backgroundColor: colors.line, padding: 3 },
   switchActive: { backgroundColor: colors.wine },
   switchKnob: { width: 17, height: 17, backgroundColor: colors.white, borderRadius: 9 },

@@ -23,6 +23,7 @@ export type Post = {
   handle: string;
   initials: string;
   role: Role;
+  userId?: string;
   cheeseId: string;
   rating: number;
   note: string;
@@ -30,6 +31,7 @@ export type Post = {
   time: string;
   likes: number;
   comments: number;
+  photoUrl?: string;
 };
 
 export const cheeses: Cheese[] = [
