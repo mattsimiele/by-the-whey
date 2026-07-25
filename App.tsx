@@ -51,7 +51,7 @@ function AppHeader({ title, subtitle }: { title?: string; subtitle?: string }) {
   );
 }
 
-function FeedScreen({ openCheese, catalog }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[] }) {
+function FeedScreen({ openCheese, catalog, feedPosts, userId }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; feedPosts: typeof seedPosts; userId?: string }) {
   const [liked, setLiked] = useState<string[]>([]);
 
   return (
@@ -83,7 +83,7 @@ function FeedScreen({ openCheese, catalog }: { openCheese: (cheese: Cheese) => v
       </View>
 
       <SectionHeader title="From your circle" action="See all" />
-      {seedPosts.map((post) => {
+      {feedPosts.map((post) => {
         const cheese = catalog.find((item) => item.id === post.cheeseId) ?? cheeses.find((item) => item.id === post.cheeseId)!;
         const isLiked = liked.includes(post.id);
         return (
@@ -124,7 +124,19 @@ function FeedScreen({ openCheese, catalog }: { openCheese: (cheese: Cheese) => v
                 <Text style={styles.locationText}>{post.place}</Text>
               </View>
               <View style={styles.socialRow}>
-                <Pressable style={styles.socialAction} onPress={() => setLiked((current) => isLiked ? current.filter((id) => id !== post.id) : [...current, post.id])}>
+                <Pressable style={styles.socialAction} onPress={async () => {
+                  if (userId && supabase && post.id.includes('-')) {
+                    const action = isLiked
+                      ? supabase.from('likes').delete().eq('user_id', userId).eq('tasting_id', post.id)
+                      : supabase.from('likes').upsert({ user_id: userId, tasting_id: post.id });
+                    const { error } = await action;
+                    if (error) {
+                      Alert.alert('Could not update like', error.message);
+                      return;
+                    }
+                  }
+                  setLiked((current) => isLiked ? current.filter((id) => id !== post.id) : [...current, post.id]);
+                }}>
                   <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={21} color={isLiked ? colors.wine : colors.ink} />
                   <Text style={[styles.socialText, isLiked && { color: colors.wine }]}>{post.likes + (isLiked ? 1 : 0)}</Text>
                 </Pressable>
@@ -207,13 +219,42 @@ function DiscoverScreen({ openCheese, catalog }: { openCheese: (cheese: Cheese) 
   );
 }
 
-function LogScreen({ onComplete, catalog }: { onComplete: () => void; catalog: Cheese[] }) {
+function LogScreen({ onComplete, catalog, userId }: { onComplete: () => void; catalog: Cheese[]; userId?: string }) {
   const [selected, setSelected] = useState<Cheese>(catalog[0] ?? cheeses[0]!);
   const [rating, setRating] = useState(4.5);
   const [note, setNote] = useState('');
   const [isPublic, setIsPublic] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const submit = () => {
+  const submit = async () => {
+    if (!supabase || !userId) {
+      Alert.alert('Account required', 'Create or sign in to an account before logging a tasting.');
+      return;
+    }
+    setSaving(true);
+    const { data: cheese, error: cheeseError } = await supabase
+      .from('cheeses')
+      .select('id')
+      .eq('slug', selected.id)
+      .eq('status', 'published')
+      .single();
+    if (cheeseError || !cheese) {
+      setSaving(false);
+      Alert.alert('Catalog entry required', 'This prototype cheese is not published in the shared catalog yet.');
+      return;
+    }
+    const { error } = await supabase.from('tastings').insert({
+      user_id: userId,
+      cheese_id: cheese.id,
+      rating,
+      notes: note.trim(),
+      visibility: isPublic ? 'public' : 'private',
+    });
+    setSaving(false);
+    if (error) {
+      Alert.alert('Could not log tasting', error.message);
+      return;
+    }
     Alert.alert('Tasting logged', `${selected.name} has been added to your cheese diary${isPublic ? ' and shared with your circle' : ''}.`);
     setNote('');
     onComplete();
@@ -269,7 +310,7 @@ function LogScreen({ onComplete, catalog }: { onComplete: () => void; catalog: C
             <View style={[styles.switch, isPublic && styles.switchActive]}><View style={[styles.switchKnob, isPublic && styles.switchKnobActive]} /></View>
           </Pressable>
         </View>
-        <PrimaryButton label="Log this tasting" icon="checkmark-circle-outline" onPress={submit} />
+        {saving ? <ActivityIndicator color={colors.wine} /> : <PrimaryButton label="Log this tasting" icon="checkmark-circle-outline" onPress={submit} />}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -405,10 +446,11 @@ function CheeseModal({ cheese, onClose }: { cheese: Cheese | null; onClose: () =
   );
 }
 
-function Root({ profile, signedIn }: { profile: UserProfile | null; signedIn: boolean }) {
+function Root({ profile, signedIn, userId }: { profile: UserProfile | null; signedIn: boolean; userId?: string }) {
   const [tab, setTab] = useState<Tab>('feed');
   const [selectedCheese, setSelectedCheese] = useState<Cheese | null>(null);
   const [catalog, setCatalog] = useState<Cheese[]>(cheeses);
+  const [feedPosts, setFeedPosts] = useState(seedPosts);
 
   useEffect(() => {
     if (!supabase) return;
@@ -435,9 +477,43 @@ function Root({ profile, signedIn }: { profile: UserProfile | null; signedIn: bo
     });
   }, []);
 
-  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} />
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from('tastings')
+      .select('id,rating,notes,location_name,created_at,user_id,cheese_id,profiles:user_id(display_name,handle,role),cheeses:cheese_id(slug,name)')
+      .eq('visibility', 'public')
+      .order('created_at', { ascending: false })
+      .limit(30)
+      .then(({ data, error }) => {
+        if (error || !data?.length) return;
+        const livePosts = data.map((row) => {
+          const author = row.profiles as unknown as { display_name: string; handle: string; role: Role };
+          const cheese = row.cheeses as unknown as { slug: string; name: string };
+          const initials = author.display_name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+          const minutes = Math.max(1, Math.round((Date.now() - new Date(row.created_at).getTime()) / 60000));
+          return {
+            id: row.id,
+            user: author.display_name,
+            handle: `@${author.handle}`,
+            initials,
+            role: author.role,
+            cheeseId: cheese.slug,
+            rating: Number(row.rating),
+            note: row.notes || `Tasted ${cheese.name}.`,
+            place: row.location_name || 'Location not added',
+            time: minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h`,
+            likes: 0,
+            comments: 0,
+          };
+        });
+        setFeedPosts([...livePosts, ...seedPosts]);
+      });
+  }, []);
+
+  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} userId={userId} />
     : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} />
-    : tab === 'log' ? <LogScreen onComplete={() => setTab('cellar')} catalog={catalog} />
+    : tab === 'log' ? <LogScreen onComplete={() => setTab('feed')} catalog={catalog} userId={userId} />
     : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} />
     : <ProfileScreen profile={profile} signedIn={signedIn} />;
 
@@ -501,7 +577,7 @@ export default function App() {
       {loadingSession ? (
         <SafeAreaView style={styles.authLoading}><ActivityIndicator color={colors.wine} /></SafeAreaView>
       ) : session || guest || !isSupabaseConfigured ? (
-        <Root profile={profile} signedIn={Boolean(session)} />
+        <Root profile={profile} signedIn={Boolean(session)} userId={session?.user.id} />
       ) : (
         <AuthScreen onGuest={() => setGuest(true)} />
       )}
