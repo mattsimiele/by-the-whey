@@ -242,7 +242,7 @@ function FeedScreen({ openCheese, openProfile, catalog, feedPosts, profile, user
               )}
               {post.photoPending && <View style={styles.pendingPhotoBadge}><Ionicons name="time-outline" size={12} color={colors.white} /><Text style={styles.pendingPhotoText}>Visible to you · awaiting review</Text></View>}
               <View style={styles.artLabel}>
-                <Text style={styles.artLabelOverline}>{cheese.style.toUpperCase()}</Text>
+                <Text style={styles.artLabelOverline} numberOfLines={3}>{cheese.style.toUpperCase()}</Text>
                 <Text style={styles.artLabelTitle}>{cheese.name}</Text>
                 <Text style={styles.artLabelMaker}>{cheese.creamery}</Text>
               </View>
@@ -1282,8 +1282,8 @@ const styles = StyleSheet.create({
   pendingPhotoBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(75,30,42,0.9)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 5 },
   pendingPhotoText: { color: colors.white, fontSize: 8, fontWeight: '800' },
   artGlow: { position: 'absolute', width: 270, height: 270, borderRadius: 150, backgroundColor: 'rgba(255,255,255,0.30)', top: -75, right: -20 },
-  artLabel: { position: 'absolute', left: 18, bottom: 17, backgroundColor: 'rgba(255,252,246,0.93)', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
-  artLabelOverline: { fontSize: 7, color: colors.wine, fontWeight: '900', letterSpacing: 1.3 },
+  artLabel: { position: 'absolute', left: 18, right: 18, bottom: 17, backgroundColor: 'rgba(255,252,246,0.93)', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
+  artLabelOverline: { fontSize: 7, lineHeight: 10, color: colors.wine, fontWeight: '900', letterSpacing: 1.2 },
   artLabelTitle: { fontSize: 18, color: colors.ink, fontWeight: '800', marginTop: 2 },
   artLabelMaker: { fontSize: 9, color: colors.muted, marginTop: 1 },
   postBody: { padding: 16 },
