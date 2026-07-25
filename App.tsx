@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -51,11 +52,15 @@ function AppHeader({ title, subtitle }: { title?: string; subtitle?: string }) {
   );
 }
 
-function FeedScreen({ openCheese, catalog, feedPosts, userId }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; feedPosts: typeof seedPosts; userId?: string }) {
+function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefresh }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; feedPosts: typeof seedPosts; userId?: string; refreshing: boolean; onRefresh: () => void }) {
   const [liked, setLiked] = useState<string[]>([]);
 
   return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={styles.screenContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.wine} colors={[colors.wine]} />}
+    >
       <AppHeader />
       <View style={styles.welcomeRow}>
         <View>
@@ -451,6 +456,8 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
   const [selectedCheese, setSelectedCheese] = useState<Cheese | null>(null);
   const [catalog, setCatalog] = useState<Cheese[]>(cheeses);
   const [feedPosts, setFeedPosts] = useState(seedPosts);
+  const [feedReload, setFeedReload] = useState(0);
+  const [refreshingFeed, setRefreshingFeed] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -478,7 +485,8 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
   }, []);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase || tab !== 'feed') return;
+    setRefreshingFeed(true);
     supabase
       .from('tastings')
       .select('id,rating,notes,location_name,created_at,user_id,cheese_id,profiles:user_id(display_name,handle,role),cheeses:cheese_id(slug,name)')
@@ -486,7 +494,12 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
       .order('created_at', { ascending: false })
       .limit(30)
       .then(({ data, error }) => {
-        if (error || !data?.length) return;
+        setRefreshingFeed(false);
+        if (error) return;
+        if (!data?.length) {
+          setFeedPosts(seedPosts);
+          return;
+        }
         const livePosts = data.map((row) => {
           const author = row.profiles as unknown as { display_name: string; handle: string; role: Role };
           const cheese = row.cheeses as unknown as { slug: string; name: string };
@@ -509,11 +522,11 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
         });
         setFeedPosts([...livePosts, ...seedPosts]);
       });
-  }, []);
+  }, [tab, feedReload]);
 
-  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} userId={userId} />
+  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} userId={userId} refreshing={refreshingFeed} onRefresh={() => setFeedReload((value) => value + 1)} />
     : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} />
-    : tab === 'log' ? <LogScreen onComplete={() => setTab('feed')} catalog={catalog} userId={userId} />
+    : tab === 'log' ? <LogScreen onComplete={() => { setFeedReload((value) => value + 1); setTab('feed'); }} catalog={catalog} userId={userId} />
     : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} />
     : <ProfileScreen profile={profile} signedIn={signedIn} />;
 
