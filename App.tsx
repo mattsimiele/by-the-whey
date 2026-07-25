@@ -79,6 +79,43 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
     });
   }, [userId, feedPosts]);
 
+  const deleteTasting = (post: Post) => {
+    if (!supabase || !userId || post.userId !== userId) return;
+    Alert.alert(
+      'Delete this tasting?',
+      'This removes the post, its likes and comments, and its photo. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const { data: photos, error: photoLookupError } = await supabase!.from('tasting_photos').select('storage_path').eq('tasting_id', post.id);
+            if (photoLookupError) {
+              Alert.alert('Could not delete tasting', photoLookupError.message);
+              return;
+            }
+            const storagePaths = (photos ?? []).map((photo) => photo.storage_path);
+            if (storagePaths.length) {
+              const { error: storageError } = await supabase!.storage.from('tasting-photos').remove(storagePaths);
+              if (storageError) {
+                Alert.alert('Could not delete photo', `${storageError.message}\n\nThe tasting was left intact.`);
+                return;
+              }
+            }
+            const { error } = await supabase!.from('tastings').delete().eq('id', post.id).eq('user_id', userId);
+            if (error) {
+              Alert.alert('Could not delete tasting', error.message);
+              return;
+            }
+            setCommentPost(null);
+            onRefresh();
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <ScrollView
       contentContainerStyle={styles.screenContent}
@@ -143,7 +180,11 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
                   <Text style={styles.followText}>{following.includes(post.userId) ? 'Following' : 'Follow'}</Text>
                 </Pressable>
               )}
-              <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
+              {post.userId === userId && (
+                <Pressable accessibilityLabel="Post options" onPress={() => deleteTasting(post)} style={styles.postMenu}>
+                  <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
+                </Pressable>
+              )}
             </View>
             <Pressable style={styles.featureArt} onPress={() => openCheese(cheese)}>
               {post.photoUrl ? <Image source={{ uri: post.photoUrl }} style={styles.postPhoto} /> : (
@@ -855,6 +896,10 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
   const [catalogReload, setCatalogReload] = useState(0);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const openNotifications = () => signedIn ? setNotificationsOpen(true) : Alert.alert('Sign in required', 'Create an account to receive community notifications.');
+  const refreshCommunity = () => {
+    setFeedReload((value) => value + 1);
+    setCatalogReload((value) => value + 1);
+  };
 
   useEffect(() => {
     if (!supabase) return;
@@ -934,9 +979,9 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
       });
   }, [tab, feedReload]);
 
-  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} profile={profile} userId={userId} refreshing={refreshingFeed} onRefresh={() => setFeedReload((value) => value + 1)} onLog={() => { setLogCheese(null); setTab('log'); }} onNotifications={openNotifications} />
+  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} profile={profile} userId={userId} refreshing={refreshingFeed} onRefresh={refreshCommunity} onLog={() => { setLogCheese(null); setTab('log'); }} onNotifications={openNotifications} />
     : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} onNotifications={openNotifications} />
-    : tab === 'log' ? <LogScreen onComplete={() => { setFeedReload((value) => value + 1); setCatalogReload((value) => value + 1); setLogCheese(null); setTab('feed'); }} catalog={catalog} initialCheese={logCheese} userId={userId} onNotifications={openNotifications} />
+    : tab === 'log' ? <LogScreen onComplete={() => { refreshCommunity(); setLogCheese(null); setTab('feed'); }} catalog={catalog} initialCheese={logCheese} userId={userId} onNotifications={openNotifications} />
     : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} userId={userId} reload={feedReload + savedReload} onNotifications={openNotifications} />
     : <ProfileScreen profile={profile} signedIn={signedIn} onManageCatalog={() => setCatalogManagementOpen(true)} onNotifications={openNotifications} />;
 
@@ -1067,6 +1112,7 @@ const styles = StyleSheet.create({
   postMeta: { color: colors.muted, fontSize: 11, marginTop: 2 },
   followButton: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.blush, borderRadius: 12 },
   followText: { color: colors.wine, fontSize: 9, fontWeight: '800' },
+  postMenu: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   featureArt: { height: 215, backgroundColor: '#E9DFC9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   postPhoto: { width: '100%', height: '100%', resizeMode: 'cover' },
   artGlow: { position: 'absolute', width: 270, height: 270, borderRadius: 150, backgroundColor: 'rgba(255,255,255,0.30)', top: -75, right: -20 },
