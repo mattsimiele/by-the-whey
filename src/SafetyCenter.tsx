@@ -22,6 +22,28 @@ export function SafetyCenter({ visible, userId, onClose }: { visible: boolean; u
   const [blocked, setBlocked] = useState<BlockedAccount[]>([]);
   const [deleting, setDeleting] = useState(false);
 
+  const openSupportEmail = async () => {
+    const url = 'mailto:support@thecurdnerd.com';
+    try {
+      if (await Linking.canOpenURL(url)) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Email support', 'No email app is configured on this device. Send your message to support@thecurdnerd.com.');
+      }
+    } catch {
+      Alert.alert('Email support', 'Could not open an email app. Send your message to support@thecurdnerd.com.');
+    }
+  };
+
+  const openWebsite = async () => {
+    const url = 'https://thecurdnerd.com';
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Website unavailable', 'Visit thecurdnerd.com in your browser.');
+    }
+  };
+
   const loadBlocked = async () => {
     if (!supabase) return;
     const { data } = await supabase.from('blocks').select('blocked_id,profile:blocked_id(display_name,handle)').eq('blocker_id', userId).order('created_at', { ascending: false });
@@ -150,7 +172,7 @@ export function SafetyCenter({ visible, userId, onClose }: { visible: boolean; u
             ['Getting help', 'If something is not working, record what you were doing, your device type, and any error message.'],
             ['Safety concerns', 'Use in-app reporting for content or behavior concerns. Urgent real-world emergencies should be directed to local emergency services.'],
             ['Account access', 'Use “Forgot password?” on the sign-in screen. Account deletion is available from the Safety tab on this page.'],
-          ]} /><Pressable style={styles.contact} onPress={() => Linking.openURL('mailto:support@thecurdnerd.com')}><Ionicons name="mail-outline" size={19} color={colors.wine} /><Text style={styles.contactText}>support@thecurdnerd.com</Text></Pressable><Pressable style={styles.contact} onPress={() => Linking.openURL('https://thecurdnerd.com')}><Ionicons name="globe-outline" size={19} color={colors.wine} /><Text style={styles.contactText}>thecurdnerd.com</Text></Pressable></>}
+          ]} /><Pressable style={styles.contact} onPress={openSupportEmail}><Ionicons name="mail-outline" size={19} color={colors.wine} /><Text style={styles.contactText}>support@thecurdnerd.com</Text></Pressable><Pressable style={styles.contact} onPress={openWebsite}><Ionicons name="globe-outline" size={19} color={colors.wine} /><Text style={styles.contactText}>thecurdnerd.com</Text></Pressable></>}
         </ScrollView>
       </SafeAreaView>
     </Modal>
