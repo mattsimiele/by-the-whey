@@ -70,8 +70,9 @@ Never place a service-role key or database password in the mobile app.
 - [ ] Support/contact page and public URL.
 - [x] Community guidelines.
 - [x] Photo/content moderation process.
+- [ ] Automated or pre-publication filtering for objectionable user content.
 - [x] Profile and tasting visibility review.
-- [ ] Verify Sign in with Apple on a physical device with production Apple configuration.
+- [ ] Verify Sign in with Apple on a physical device with production Apple configuration and revoke Apple tokens during account deletion.
 
 The Privacy and Support pages now exist in-app, but their public URLs and final contact address must still be added before TestFlight/App Review. Sign in with Apple must be verified after the Apple Developer enrollment is active. See [`docs/MODERATION.md`](docs/MODERATION.md) for the operational moderation workflow.
 
