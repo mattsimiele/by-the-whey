@@ -25,6 +25,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import { AuthScreen } from './src/AuthScreen';
 import { CatalogManagement } from './src/CatalogManagement';
+import { SafetyCenter } from './src/SafetyCenter';
 import { Brand, CheeseArt, PrimaryButton, Rating, SectionHeader } from './src/components';
 import { Cheese, Post, Role } from './src/data';
 import { isSupabaseConfigured, supabase } from './src/lib/supabase';
@@ -116,6 +117,51 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
     );
   };
 
+  const report = async (targetType: 'profile' | 'tasting', targetId: string) => {
+    if (!supabase || !userId) return Alert.alert('Sign in required', 'Sign in to report content or accounts.');
+    const { error } = await supabase.from('reports').insert({
+      reporter_id: userId,
+      target_type: targetType,
+      target_id: targetId,
+      reason: 'Community safety review requested',
+    });
+    if (error) return Alert.alert('Could not submit report', error.message);
+    Alert.alert('Report received', 'An administrator will review it. Thank you for helping protect the community.');
+  };
+
+  const block = (post: Post) => {
+    if (!supabase || !userId || !post.userId) return;
+    Alert.alert('Block this account?', `You and ${post.user} will no longer see or interact with each other.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await supabase!.from('blocks').insert({ blocker_id: userId, blocked_id: post.userId });
+          if (error) return Alert.alert('Could not block account', error.message);
+          await supabase!.from('follows').delete().eq('follower_id', userId).eq('following_id', post.userId);
+          onRefresh();
+        },
+      },
+    ]);
+  };
+
+  const openPostMenu = (post: Post) => {
+    if (post.userId === userId) return deleteTasting(post);
+    Alert.alert(post.user, 'Choose a safety action.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Report',
+        onPress: () => Alert.alert('What would you like reviewed?', undefined, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'This tasting', onPress: () => report('tasting', post.id) },
+          { text: 'This account', onPress: () => post.userId && report('profile', post.userId) },
+        ]),
+      },
+      { text: 'Block account', style: 'destructive', onPress: () => block(post) },
+    ]);
+  };
+
   return (
     <ScrollView
       contentContainerStyle={styles.screenContent}
@@ -180,8 +226,8 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
                   <Text style={styles.followText}>{following.includes(post.userId) ? 'Following' : 'Follow'}</Text>
                 </Pressable>
               )}
-              {post.userId === userId && (
-                <Pressable accessibilityLabel="Post options" onPress={() => deleteTasting(post)} style={styles.postMenu}>
+              {post.userId && (
+                <Pressable accessibilityLabel="Post options" onPress={() => openPostMenu(post)} style={styles.postMenu}>
                   <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
                 </Pressable>
               )}
@@ -248,13 +294,13 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
 }
 
 function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | null; userId?: string; onCommented: () => void; onClose: () => void }) {
-  const [comments, setComments] = useState<{ id: string; body: string; created_at: string; profiles: { display_name: string; handle: string } }[]>([]);
+  const [comments, setComments] = useState<{ id: string; user_id: string; body: string; created_at: string; profiles: { display_name: string; handle: string } }[]>([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
 
   const load = async () => {
     if (!supabase || !post) return;
-    const { data } = await supabase.from('comments').select('id,body,created_at,profiles:user_id(display_name,handle)').eq('tasting_id', post.id).order('created_at');
+    const { data } = await supabase.from('comments').select('id,user_id,body,created_at,profiles:user_id(display_name,handle)').eq('tasting_id', post.id).order('created_at');
     setComments((data ?? []) as unknown as typeof comments);
   };
 
@@ -269,6 +315,30 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
     setBody('');
     load();
     onCommented();
+  };
+
+  const manageComment = (comment: typeof comments[number]) => {
+    if (!supabase || !userId) return;
+    if (comment.user_id === userId) {
+      Alert.alert('Delete comment?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          const { error } = await supabase!.from('comments').delete().eq('id', comment.id).eq('user_id', userId);
+          if (error) return Alert.alert('Could not delete comment', error.message);
+          load();
+          onCommented();
+        } },
+      ]);
+      return;
+    }
+    Alert.alert('Report this comment?', 'An administrator will review the comment for safety concerns.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Report', style: 'destructive', onPress: async () => {
+        const { error } = await supabase!.from('reports').insert({ reporter_id: userId, target_type: 'comment', target_id: comment.id, reason: 'Community safety review requested' });
+        if (error) return Alert.alert('Could not submit report', error.message);
+        Alert.alert('Report received', 'Thank you for helping protect the community.');
+      } },
+    ]);
   };
 
   return (
@@ -287,6 +357,7 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
                 <Text style={styles.commentName}>{comment.profiles.display_name} <Text style={styles.commentHandle}>@{comment.profiles.handle}</Text></Text>
                 <Text style={styles.commentBody}>{comment.body}</Text>
               </View>
+              <Pressable accessibilityLabel="Comment options" onPress={() => manageComment(comment)} style={styles.commentMenu}><Ionicons name="ellipsis-horizontal" size={18} color={colors.muted} /></Pressable>
             </View>
           )) : <Text style={styles.emptyComments}>Start the conversation about this tasting.</Text>}
         </ScrollView>
@@ -634,7 +705,7 @@ function CellarScreen({ openCheese, catalog, userId, reload, onNotifications }: 
   );
 }
 
-function ProfileScreen({ profile, signedIn, onManageCatalog, onNotifications }: { profile: UserProfile | null; signedIn: boolean; onManageCatalog: () => void; onNotifications: () => void }) {
+function ProfileScreen({ profile, signedIn, onManageCatalog, onSafety, onNotifications }: { profile: UserProfile | null; signedIn: boolean; onManageCatalog: () => void; onSafety: () => void; onNotifications: () => void }) {
   const role = profile?.role ?? 'turophile';
   const displayName = profile?.display_name ?? 'Guest Turophile';
   const initials = displayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'BT';
@@ -681,6 +752,16 @@ function ProfileScreen({ profile, signedIn, onManageCatalog, onNotifications }: 
 
       <SectionHeader title="Account access" />
       <Text style={styles.roleHelper}>Your role is secured by Supabase and can only be changed by an administrator.</Text>
+      {signedIn && (
+        <Pressable style={styles.rolePanel} onPress={onSafety}>
+          <Ionicons name="shield-checkmark-outline" size={24} color={colors.wine} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rolePanelTitle}>Safety, privacy & support</Text>
+            <Text style={styles.rolePanelCopy}>Manage blocked accounts, read policies and guidelines, get help, or delete your account.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.wine} />
+        </Pressable>
+      )}
       {role !== 'turophile' && (
         <Pressable style={styles.rolePanel} onPress={onManageCatalog}>
           <Ionicons name={role === 'admin' ? 'settings-outline' : 'add-circle-outline'} size={24} color={colors.wine} />
@@ -743,6 +824,15 @@ function CheeseModal({ cheese, userId, onSavedChange, onLog, onClose }: { cheese
     onSavedChange();
   };
 
+  const reportCheese = async () => {
+    if (!supabase || !userId || !cheese) return Alert.alert('Sign in required', 'Sign in to report a catalog entry.');
+    const { data: catalogRow, error: catalogError } = await supabase.from('cheeses').select('id').eq('slug', cheese.id).single();
+    if (catalogError || !catalogRow) return Alert.alert('Could not report cheese', catalogError?.message ?? 'Catalog entry was not found.');
+    const { error } = await supabase.from('reports').insert({ reporter_id: userId, target_type: 'cheese', target_id: catalogRow.id, reason: 'Catalog accuracy or safety review requested' });
+    if (error) return Alert.alert('Could not submit report', error.message);
+    Alert.alert('Report received', 'An administrator will review this cheese entry.');
+  };
+
   if (!cheese) return null;
   const personalAverage = personalTastings.length ? personalTastings.reduce((sum, tasting) => sum + tasting.rating, 0) / personalTastings.length : null;
   return (
@@ -800,6 +890,7 @@ function CheeseModal({ cheese, userId, onSavedChange, onLog, onClose }: { cheese
             <PrimaryButton label={saved ? 'Saved for later' : 'Save for later'} icon={saved ? 'bookmark' : 'bookmark-outline'} secondary onPress={toggleSaved} />
             <View style={{ height: 10 }} />
             <PrimaryButton label="Log a tasting" icon="add-circle-outline" onPress={() => onLog(cheese)} />
+            {userId && <Pressable style={styles.reportCheese} onPress={reportCheese}><Ionicons name="flag-outline" size={15} color={colors.muted} /><Text style={styles.reportCheeseText}>Report catalog information</Text></Pressable>}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -895,6 +986,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
   const [catalogManagementOpen, setCatalogManagementOpen] = useState(false);
   const [catalogReload, setCatalogReload] = useState(0);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [safetyOpen, setSafetyOpen] = useState(false);
   const openNotifications = () => signedIn ? setNotificationsOpen(true) : Alert.alert('Sign in required', 'Create an account to receive community notifications.');
   const refreshCommunity = () => {
     setFeedReload((value) => value + 1);
@@ -983,7 +1075,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
     : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} onNotifications={openNotifications} />
     : tab === 'log' ? <LogScreen onComplete={() => { refreshCommunity(); setLogCheese(null); setTab('feed'); }} catalog={catalog} initialCheese={logCheese} userId={userId} onNotifications={openNotifications} />
     : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} userId={userId} reload={feedReload + savedReload} onNotifications={openNotifications} />
-    : <ProfileScreen profile={profile} signedIn={signedIn} onManageCatalog={() => setCatalogManagementOpen(true)} onNotifications={openNotifications} />;
+    : <ProfileScreen profile={profile} signedIn={signedIn} onManageCatalog={() => setCatalogManagementOpen(true)} onSafety={() => setSafetyOpen(true)} onNotifications={openNotifications} />;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -1006,6 +1098,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
       <CheeseModal cheese={selectedCheese} userId={userId} onSavedChange={() => setSavedReload((value) => value + 1)} onLog={(cheese) => { setSelectedCheese(null); setLogCheese(cheese); setTab('log'); }} onClose={() => setSelectedCheese(null)} />
       {profile && userId && <CatalogManagement visible={catalogManagementOpen} role={profile.role} userId={userId} onClose={() => { setCatalogManagementOpen(false); setCatalogReload((value) => value + 1); }} />}
       <NotificationsModal visible={notificationsOpen} userId={userId} onClose={() => setNotificationsOpen(false)} />
+      {userId && <SafetyCenter visible={safetyOpen} userId={userId} onClose={() => setSafetyOpen(false)} />}
     </SafeAreaView>
   );
 }
@@ -1139,6 +1232,7 @@ const styles = StyleSheet.create({
   commentAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.wine, alignItems: 'center', justifyContent: 'center' },
   commentAvatarText: { color: colors.white, fontWeight: '800' },
   commentBubble: { flex: 1, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 15, padding: 12 },
+  commentMenu: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   commentName: { color: colors.ink, fontWeight: '800', fontSize: 11 },
   commentHandle: { color: colors.muted, fontWeight: '500' },
   commentBody: { color: colors.ink, fontSize: 13, lineHeight: 19, marginTop: 5 },
@@ -1274,6 +1368,8 @@ const styles = StyleSheet.create({
   pairingNote: { paddingHorizontal: 13, paddingVertical: 9, backgroundColor: colors.blush, borderRadius: 16 },
   pairingNoteText: { color: colors.wine, fontSize: 11, fontWeight: '700' },
   detailActions: { padding: 20 },
+  reportCheese: { marginTop: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9 },
+  reportCheeseText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
   personalTastingList: { gap: 10, paddingHorizontal: 20 },
   personalTastingCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 14 },
   personalTastingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

@@ -59,12 +59,32 @@ Never place a service-role key or database password in the mobile app.
 
 ## Product roadmap
 
-1. Connect Supabase and replace prototype data.
-2. Add email and Sign in with Apple authentication.
-3. Implement image upload, follows, comments, and notifications.
-4. Add cheesemonger submissions and admin moderation.
-5. Add reporting, blocking, account deletion, privacy policy, and support links.
-6. Test with a small group through TestFlight.
-7. Prepare screenshots, metadata, and submit to App Review.
+### Safety and App Store requirements
+
+- [x] Report users, tastings, comments, and cheeses.
+- [x] Block and unblock users.
+- [x] Admin report-review dashboard.
+- [x] In-app account deletion.
+- [ ] Privacy policy page and public URL.
+- [x] Terms of use.
+- [ ] Support/contact page and public URL.
+- [x] Community guidelines.
+- [x] Photo/content moderation process.
+- [x] Profile and tasting visibility review.
+- [ ] Verify Sign in with Apple on a physical device with production Apple configuration.
+
+The Privacy and Support pages now exist in-app, but their public URLs and final contact address must still be added before TestFlight/App Review. Sign in with Apple must be verified after the Apple Developer enrollment is active. See [`docs/MODERATION.md`](docs/MODERATION.md) for the operational moderation workflow.
+
+### Remaining product polish
+
+- Editable profiles and profile photos.
+- Calculated palate insights.
+- Public user profiles and follower/following management.
+- Tasting and comment editing.
+- Accurate live notification badges.
+- Real catalog photography and image moderation.
+- Robust loading, offline, and error states.
+- Multi-account iPhone and Android testing.
+- TestFlight/internal testing, App Store metadata, screenshots, privacy disclosures, and review submission.
 
 Monetization should follow product validation. Premium palate insights, producer/retailer profiles, affiliate storefront links, and tasteful sponsored discovery placements fit the concept better than an ad-heavy feed.

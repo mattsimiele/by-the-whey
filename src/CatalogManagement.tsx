@@ -40,13 +40,15 @@ const emptyDraft: Draft = {
 };
 
 type Submission = Draft & { id: string; slug: string; flavor_profile: string[]; pairings: string[]; profiles: { display_name: string; handle: string } };
+type Report = { id: string; target_type: string; target_id: string; reason: string; status: string; created_at: string; reporter_handle: string; target_preview: string | null };
 
 export function CatalogManagement({ visible, role, userId, onClose }: { visible: boolean; role: Role; userId: string; onClose: () => void }) {
-  const [tab, setTab] = useState<'submit' | 'review' | 'users'>(role === 'admin' ? 'review' : 'submit');
+  const [tab, setTab] = useState<'submit' | 'review' | 'reports' | 'users'>(role === 'admin' ? 'review' : 'submit');
   const [draft, setDraft] = useState(emptyDraft);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [saving, setSaving] = useState(false);
   const [accounts, setAccounts] = useState<{ id: string; display_name: string; handle: string; role: Role }[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
 
   const loadSubmissions = async () => {
     if (!supabase || role !== 'admin') return;
@@ -65,11 +67,19 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     setAccounts((data ?? []) as typeof accounts);
   };
 
+  const loadReports = async () => {
+    if (!supabase || role !== 'admin') return;
+    const { data, error } = await supabase.rpc('admin_report_queue');
+    if (error) return Alert.alert('Could not load reports', error.message);
+    setReports((data ?? []) as unknown as Report[]);
+  };
+
   useEffect(() => {
     if (visible) {
       setTab(role === 'admin' ? 'review' : 'submit');
       loadSubmissions();
       loadAccounts();
+      loadReports();
     }
   }, [visible, role]);
 
@@ -116,6 +126,13 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     setAccounts((current) => current.map((account) => account.id === id ? { ...account, role: nextRole } : account));
   };
 
+  const resolveReport = async (id: string, status: 'actioned' | 'dismissed') => {
+    if (!supabase) return;
+    const { error } = await supabase.from('reports').update({ status, reviewed_by: userId }).eq('id', id);
+    if (error) return Alert.alert('Could not update report', error.message);
+    setReports((current) => current.filter((report) => report.id !== id));
+  };
+
   const fields: { key: keyof Draft; label: string; placeholder: string; multiline?: boolean }[] = [
     { key: 'name', label: 'Cheese name', placeholder: 'Shelburne 2 Year' },
     { key: 'creamery_name', label: 'Creamery', placeholder: 'Shelburne Farms' },
@@ -142,7 +159,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
         </View>
         {role === 'admin' && (
           <View style={styles.tabs}>
-            {(['review', 'submit', 'users'] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item === 'review' ? `Review (${submissions.length})` : item === 'submit' ? 'Add cheese' : 'Users'}</Text></Pressable>)}
+            {(['review', 'reports', 'submit', 'users'] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item === 'review' ? `Cheese (${submissions.length})` : item === 'reports' ? `Reports (${reports.length})` : item === 'submit' ? 'Add' : 'Users'}</Text></Pressable>)}
           </View>
         )}
         {tab === 'submit' ? (
@@ -169,6 +186,21 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
                 <View style={styles.actions}>
                   <Pressable onPress={() => review(item.id, false)} style={styles.reject}><Text style={styles.rejectText}>Return</Text></Pressable>
                   <Pressable onPress={() => review(item.id, true)} style={styles.approve}><Ionicons name="checkmark" size={17} color={colors.white} /><Text style={styles.approveText}>Publish</Text></Pressable>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        ) : tab === 'reports' ? (
+          <ScrollView contentContainerStyle={styles.content}>
+            {!reports.length ? <View style={styles.empty}><Ionicons name="shield-checkmark-outline" size={40} color={colors.sage} /><Text style={styles.emptyTitle}>Report queue is clear</Text><Text style={styles.helper}>New community reports will appear here.</Text></View> : reports.map((report) => (
+              <View key={report.id} style={styles.submission}>
+                <Text style={styles.submissionTitle}>{report.target_type.charAt(0).toUpperCase() + report.target_type.slice(1)} report</Text>
+                <Text style={styles.submitter}>Reported by @{report.reporter_handle} · {new Date(report.created_at).toLocaleDateString()}</Text>
+                <Text style={styles.summary}>{report.target_preview || `Removed target · ${report.target_id}`}</Text>
+                <Text style={styles.story}>{report.reason}</Text>
+                <View style={styles.actions}>
+                  <Pressable onPress={() => resolveReport(report.id, 'dismissed')} style={styles.reject}><Text style={styles.rejectText}>Dismiss</Text></Pressable>
+                  <Pressable onPress={() => resolveReport(report.id, 'actioned')} style={styles.approve}><Ionicons name="checkmark" size={17} color={colors.white} /><Text style={styles.approveText}>Actioned</Text></Pressable>
                 </View>
               </View>
             ))}
