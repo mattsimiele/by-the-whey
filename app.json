@@ -9,7 +9,49 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.thecurdnerd.bythewhey",
-      "usesAppleSignIn": true
+      "buildNumber": "1",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "By the Whey accesses your photo library only when you choose a cheese tasting or profile photo to upload.",
+        "NSCameraUsageDescription": "By the Whey accesses your camera only when you choose to photograph a cheese tasting or profile photo."
+      },
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": [
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeName",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeUserID",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhotosorVideos",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContent",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          }
+        ]
+      }
     },
     "android": {
       "package": "com.thecurdnerd.bythewhey",
@@ -25,8 +67,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "By the Whey accesses your photos so you can add them to cheese tastings.",
-          "cameraPermission": "By the Whey accesses your camera so you can photograph cheese tastings.",
+          "photosPermission": "By the Whey accesses your photo library only when you choose a cheese tasting or profile photo to upload.",
+          "cameraPermission": "By the Whey accesses your camera only when you choose to photograph a cheese tasting or profile photo.",
           "microphonePermission": false
         }
       ]

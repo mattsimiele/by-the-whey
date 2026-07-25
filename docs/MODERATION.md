@@ -2,7 +2,7 @@
 
 ## User controls
 
-- Every tasting and account can be reported from its feed menu.
+- Every tasting and account can be reported from its feed menu with a specific reason.
 - Comments and catalog entries have their own report controls.
 - New tasting photos are hidden from other users until an administrator approves them.
 - Server-side text checks reject clearly harmful, explicit, or spam-like content before publication.
@@ -16,10 +16,15 @@ Administrators review open reports in **Profile → Manage the community → Rep
 
 Administrators review new photos in **Profile → Manage the community → Photos**. Approval makes a photo eligible for public feed display. Rejection deletes the stored photo and its database record while preserving the tasting.
 
-An administrator must inspect the referenced content and choose:
+An administrator must inspect the referenced content and choose a concrete outcome:
 
 - **Dismissed:** no violation or insufficient evidence.
-- **Actioned:** content was removed, corrected, or the responsible account was restricted.
+- **Remove content:** deletes a reported tasting or comment.
+- **Correct/Reject cheese:** opens a catalog entry for correction and republication, or removes it from the published catalog.
+- **Warn account:** records a warning and notifies the account.
+- **Suspend account:** signs the account out, blocks new contributions at the database layer, and hides its public tastings/comments.
+- **Remove account:** permanently removes a non-admin account and associated data.
+- **Restore account:** returns a suspended account to active status.
 
 The report status and reviewing administrator are stored for accountability.
 

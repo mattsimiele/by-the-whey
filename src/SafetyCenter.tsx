@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from './components';
 import { supabase } from './lib/supabase';
@@ -84,6 +85,23 @@ export function SafetyCenter({ visible, userId, onClose }: { visible: boolean; u
                 onPress: async () => {
                   if (!supabase) return;
                   setDeleting(true);
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const identities = sessionData.session?.user.identities ?? [];
+                  const usesApple = identities.some((identity) => identity.provider === 'apple');
+                  if (usesApple && Platform.OS === 'ios') {
+                    try {
+                      const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
+                      if (!credential.authorizationCode) throw new Error('Apple did not return an authorization code.');
+                      const { error: revokeError } = await supabase.functions.invoke('revoke-apple-token', {
+                        body: { authorizationCode: credential.authorizationCode },
+                      });
+                      if (revokeError) throw revokeError;
+                    } catch (error) {
+                      setDeleting(false);
+                      if ((error as { code?: string }).code === 'ERR_REQUEST_CANCELED') return;
+                      return Alert.alert('Apple authorization could not be revoked', error instanceof Error ? error.message : 'Please try again before deleting your account.');
+                    }
+                  }
                   const { data: tastings, error: tastingError } = await supabase.from('tastings').select('id').eq('user_id', userId);
                   if (tastingError) {
                     setDeleting(false);

@@ -31,10 +31,11 @@ import { EditableTasting, EditTastingModal } from './src/EditTastingModal';
 import { Brand, CheeseArt, PrimaryButton, Rating, SectionHeader } from './src/components';
 import { Cheese, Post, Role } from './src/data';
 import { isSupabaseConfigured, supabase } from './src/lib/supabase';
+import { chooseReportReason } from './src/reporting';
 import { colors, shadow } from './src/theme';
 
 type Tab = 'feed' | 'discover' | 'log' | 'cellar' | 'profile';
-type UserProfile = ProfileRecord & { role: Role; role_approved: boolean };
+type UserProfile = ProfileRecord & { role: Role; role_approved: boolean; account_status?: 'active' | 'warned' | 'suspended'; moderation_note?: string | null };
 
 const tabItems: { id: Tab; label: string; icon: keyof typeof Ionicons.glyphMap; active: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'feed', label: 'Feed', icon: 'home-outline', active: 'home' },
@@ -124,15 +125,8 @@ function FeedScreen({ openCheese, openProfile, catalog, feedPosts, profile, user
   };
 
   const report = async (targetType: 'profile' | 'tasting', targetId: string) => {
-    if (!supabase || !userId) return Alert.alert('Sign in required', 'Sign in to report content or accounts.');
-    const { error } = await supabase.from('reports').insert({
-      reporter_id: userId,
-      target_type: targetType,
-      target_id: targetId,
-      reason: 'Community safety review requested',
-    });
-    if (error) return Alert.alert('Could not submit report', error.message);
-    Alert.alert('Report received', 'An administrator will review it. Thank you for helping protect the community.');
+    if (!userId) return Alert.alert('Sign in required', 'Sign in to report content or accounts.');
+    chooseReportReason(userId, targetType, targetId);
   };
 
   const block = (post: Post) => {
@@ -339,14 +333,7 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
       ]);
       return;
     }
-    Alert.alert('Report this comment?', 'An administrator will review the comment for safety concerns.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Report', style: 'destructive', onPress: async () => {
-        const { error } = await supabase!.from('reports').insert({ reporter_id: userId, target_type: 'comment', target_id: comment.id, reason: 'Community safety review requested' });
-        if (error) return Alert.alert('Could not submit report', error.message);
-        Alert.alert('Report received', 'Thank you for helping protect the community.');
-      } },
-    ]);
+    chooseReportReason(userId, 'comment', comment.id);
   };
 
   return (
@@ -848,9 +835,7 @@ function CheeseModal({ cheese, userId, onSavedChange, onTastingUpdated, onLog, o
     if (!supabase || !userId || !cheese) return Alert.alert('Sign in required', 'Sign in to report a catalog entry.');
     const { data: catalogRow, error: catalogError } = await supabase.from('cheeses').select('id').eq('slug', cheese.id).single();
     if (catalogError || !catalogRow) return Alert.alert('Could not report cheese', catalogError?.message ?? 'Catalog entry was not found.');
-    const { error } = await supabase.from('reports').insert({ reporter_id: userId, target_type: 'cheese', target_id: catalogRow.id, reason: 'Catalog accuracy or safety review requested' });
-    if (error) return Alert.alert('Could not submit report', error.message);
-    Alert.alert('Report received', 'An administrator will review this cheese entry.');
+    chooseReportReason(userId, 'cheese', catalogRow.id);
   };
 
   if (!cheese) return null;
@@ -941,6 +926,9 @@ function NotificationsModal({ visible, userId, onChanged, onClose }: { visible: 
     if (item.kind === 'like') return `${name} liked your tasting.`;
     if (item.kind === 'comment') return `${name} commented on your tasting.`;
     if (item.kind === 'cheese_approved') return 'Your cheese submission was approved.';
+    if (item.kind === 'warn_account') return 'An administrator issued a community warning. Review the Community Guidelines.';
+    if (item.kind === 'suspend_account') return 'Your account has been suspended. Contact support if you believe this is an error.';
+    if (item.kind === 'restore_account') return 'Your account access has been restored.';
     return 'Your cheese submission needs revision.';
   };
 
@@ -955,7 +943,7 @@ function NotificationsModal({ visible, userId, onChanged, onClose }: { visible: 
         <ScrollView contentContainerStyle={styles.notificationList}>
           {items.length ? items.map((item) => (
             <View key={item.id} style={[styles.notificationItem, !item.read_at && styles.notificationUnread]}>
-              <View style={styles.notificationIcon}><Ionicons name={item.kind === 'follow' ? 'person-add-outline' : item.kind === 'comment' ? 'chatbubble-outline' : 'heart-outline'} size={19} color={colors.wine} /></View>
+              <View style={styles.notificationIcon}><Ionicons name={item.kind === 'follow' ? 'person-add-outline' : item.kind === 'comment' ? 'chatbubble-outline' : item.kind.includes('account') ? 'shield-outline' : 'heart-outline'} size={19} color={colors.wine} /></View>
               <View style={{ flex: 1 }}><Text style={styles.notificationText}>{message(item)}</Text><Text style={styles.notificationTime}>{new Date(item.created_at).toLocaleDateString()}</Text></View>
               {!item.read_at && <View style={styles.unreadDot} />}
             </View>
@@ -1213,8 +1201,19 @@ export default function App() {
       setProfile(null);
       return;
     }
-    supabase.from('profiles').select('id,handle,display_name,bio,location,avatar_path,role,role_approved').eq('id', session.user.id).single()
-      .then(({ data }) => setProfile(data as UserProfile | null));
+    supabase.from('profiles').select('id,handle,display_name,bio,location,avatar_path,role,role_approved,account_status,moderation_note').eq('id', session.user.id).single()
+      .then(async ({ data }) => {
+        const nextProfile = data as UserProfile | null;
+        if (nextProfile?.account_status === 'suspended') {
+          Alert.alert('Account suspended', nextProfile.moderation_note || 'This account has been suspended. Contact support@thecurdnerd.com if you believe this is an error.');
+          await supabase!.auth.signOut();
+          return;
+        }
+        setProfile(nextProfile);
+        if (nextProfile?.account_status === 'warned') {
+          Alert.alert('Community warning', nextProfile.moderation_note || 'An administrator issued a warning for this account. Please review the Community Guidelines.');
+        }
+      });
   }, [session, profileReload]);
 
   return (

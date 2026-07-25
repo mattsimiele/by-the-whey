@@ -40,15 +40,17 @@ const emptyDraft: Draft = {
 };
 
 type Submission = Draft & { id: string; slug: string; flavor_profile: string[]; pairings: string[]; profiles: { display_name: string; handle: string } };
-type Report = { id: string; target_type: string; target_id: string; reason: string; status: string; created_at: string; reporter_handle: string; target_preview: string | null };
+type Report = { id: string; target_type: string; target_id: string; reason: string; reason_code: string | null; status: string; created_at: string; reporter_handle: string; target_preview: string | null; target_user_id: string | null };
 type PhotoReview = { id: string; storage_path: string; created_at: string; signed_url?: string; tasting: { notes: string; rating: number; visibility: string; profile: { display_name: string; handle: string } } };
+type Account = { id: string; display_name: string; handle: string; role: Role; account_status: 'active' | 'warned' | 'suspended'; warning_count: number; moderation_note: string | null };
 
 export function CatalogManagement({ visible, role, userId, onClose }: { visible: boolean; role: Role; userId: string; onClose: () => void }) {
   const [tab, setTab] = useState<'submit' | 'review' | 'photos' | 'reports' | 'users'>(role === 'admin' ? 'review' : 'submit');
   const [draft, setDraft] = useState(emptyDraft);
+  const [editingCheeseId, setEditingCheeseId] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [saving, setSaving] = useState(false);
-  const [accounts, setAccounts] = useState<{ id: string; display_name: string; handle: string; role: Role }[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [photos, setPhotos] = useState<PhotoReview[]>([]);
 
@@ -65,8 +67,8 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
 
   const loadAccounts = async () => {
     if (!supabase || role !== 'admin') return;
-    const { data } = await supabase.from('profiles').select('id,display_name,handle,role').order('display_name');
-    setAccounts((data ?? []) as typeof accounts);
+    const { data } = await supabase.from('profiles').select('id,display_name,handle,role,account_status,warning_count,moderation_note').order('display_name');
+    setAccounts((data ?? []) as Account[]);
   };
 
   const loadReports = async () => {
@@ -108,18 +110,23 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     if (missing) return Alert.alert('Complete every field', 'Published cheese records require all catalog information.');
     setSaving(true);
     const slug = draft.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const { error } = await supabase.from('cheeses').insert({
+    const payload = {
       ...draft,
       slug,
       flavor_profile: draft.flavor_profile.split(',').map((item) => item.trim()).filter(Boolean),
       pairings: draft.pairings.split(',').map((item) => item.trim()).filter(Boolean),
-      status: 'pending',
+      status: role === 'admin' && editingCheeseId ? 'published' : 'pending',
       submitted_by: userId,
-    });
+      approved_by: role === 'admin' && editingCheeseId ? userId : null,
+    };
+    const { error } = editingCheeseId
+      ? await supabase.from('cheeses').update(payload).eq('id', editingCheeseId)
+      : await supabase.from('cheeses').insert(payload);
     setSaving(false);
     if (error) return Alert.alert(error.message.includes('CONTENT_REVIEW_REQUIRED') ? 'Submission needs revision' : 'Could not submit cheese', error.message.includes('CONTENT_REVIEW_REQUIRED') ? 'Please remove potentially harmful, explicit, or spam-like language and try again.' : error.message);
     setDraft(emptyDraft);
-    Alert.alert('Submitted for review', 'An administrator can now review this cheese for publication.');
+    setEditingCheeseId(null);
+    Alert.alert(editingCheeseId ? 'Cheese corrected' : 'Submitted for review', editingCheeseId ? 'The corrected catalog entry is now published.' : 'An administrator can now review this cheese for publication.');
     if (role === 'admin') {
       setTab('review');
       loadSubmissions();
@@ -148,6 +155,71 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     const { error } = await supabase.from('reports').update({ status, reviewed_by: userId }).eq('id', id);
     if (error) return Alert.alert('Could not update report', error.message);
     setReports((current) => current.filter((report) => report.id !== id));
+  };
+
+  const enforceReport = (report: Report, action: 'remove_content' | 'warn_account' | 'suspend_account') => {
+    const label = action === 'remove_content' ? 'Remove reported content' : action === 'warn_account' ? 'Warn account' : 'Suspend account';
+    Alert.alert(label, `Apply this action to ${report.target_preview ?? 'the reported item'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: label, style: 'destructive', onPress: async () => {
+        const { error } = await supabase!.rpc('admin_enforce_report', { report_id: report.id, enforcement_action: action, admin_note: report.reason });
+        if (error) return Alert.alert('Could not enforce report', error.message);
+        setReports((current) => current.filter((item) => item.id !== report.id));
+        loadAccounts();
+      } },
+    ]);
+  };
+
+  const editReportedCheese = async (report: Report) => {
+    const { data, error } = await supabase!.from('cheeses').select('*').eq('id', report.target_id).single();
+    if (error || !data) return Alert.alert('Could not open cheese', error?.message ?? 'Cheese not found.');
+    setDraft({
+      name: data.name, creamery_name: data.creamery_name, location_city: data.location_city,
+      location_region: data.location_region, location_country: data.location_country,
+      milk_type: data.milk_type, rennet: data.rennet, cheese_style: data.cheese_style,
+      catalog_category: data.catalog_category, age_description: data.age_description,
+      flavor_profile: (data.flavor_profile ?? []).join(', '), story_notes: data.story_notes,
+      pairings: (data.pairings ?? []).join(', '),
+    });
+    setEditingCheeseId(report.target_id);
+    setTab('submit');
+  };
+
+  const setAccountStatus = (account: Account, next: 'active' | 'warned' | 'suspended') => {
+    Alert.alert(`${next === 'active' ? 'Restore' : next === 'warned' ? 'Warn' : 'Suspend'} account?`, `This will update @${account.handle}'s access and notify them.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Confirm', style: next === 'active' ? 'default' : 'destructive', onPress: async () => {
+        const { error } = await supabase!.rpc('admin_set_account_status', { target_user_id: account.id, next_status: next, admin_note: 'Updated by administrator' });
+        if (error) return Alert.alert('Could not update account', error.message);
+        loadAccounts();
+      } },
+    ]);
+  };
+
+  const removeAccount = (account: Account) => {
+    Alert.alert('Permanently remove account?', `Delete @${account.handle} and all associated data? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove account', style: 'destructive', onPress: async () => {
+        const { data: tastings } = await supabase!.from('tastings').select('id').eq('user_id', account.id);
+        const tastingIds = (tastings ?? []).map((item) => item.id);
+        if (tastingIds.length) {
+          const { data: photos } = await supabase!.from('tasting_photos').select('storage_path').in('tasting_id', tastingIds);
+          const photoPaths = (photos ?? []).map((item) => item.storage_path);
+          if (photoPaths.length) {
+            const { error: photoError } = await supabase!.storage.from('tasting-photos').remove(photoPaths);
+            if (photoError) return Alert.alert('Could not remove account photos', photoError.message);
+          }
+        }
+        const { data: profile } = await supabase!.from('profiles').select('avatar_path').eq('id', account.id).single();
+        if (profile?.avatar_path) {
+          const { error: avatarError } = await supabase!.storage.from('profile-avatars').remove([profile.avatar_path]);
+          if (avatarError) return Alert.alert('Could not remove profile photo', avatarError.message);
+        }
+        const { error } = await supabase!.rpc('admin_remove_account', { target_user_id: account.id });
+        if (error) return Alert.alert('Could not remove account', error.message);
+        setAccounts((current) => current.filter((item) => item.id !== account.id));
+      } },
+    ]);
   };
 
   const reviewPhoto = async (photo: PhotoReview, approve: boolean) => {
@@ -195,14 +267,14 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
         )}
         {tab === 'submit' ? (
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <Text style={styles.helper}>Every field is required so the catalog remains useful and consistent.</Text>
+            <Text style={styles.helper}>{editingCheeseId ? 'Correct the reported information. Saving republishes the entry.' : 'Every field is required so the catalog remains useful and consistent.'}</Text>
             {fields.map((field) => (
               <View key={field.key}>
                 <Text style={styles.label}>{field.label.toUpperCase()}</Text>
                 <TextInput value={draft[field.key]} onChangeText={(value) => setField(field.key, value)} placeholder={field.placeholder} placeholderTextColor="#9B958A" multiline={field.multiline} style={[styles.input, field.multiline && styles.multiline]} />
               </View>
             ))}
-            {saving ? <ActivityIndicator color={colors.wine} /> : <PrimaryButton label="Submit for review" icon="arrow-forward" onPress={submit} />}
+            {saving ? <ActivityIndicator color={colors.wine} /> : <PrimaryButton label={editingCheeseId ? 'Save correction' : 'Submit for review'} icon="arrow-forward" onPress={submit} />}
           </ScrollView>
         ) : tab === 'review' ? (
           <ScrollView contentContainerStyle={styles.content}>
@@ -244,24 +316,32 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
                 <Text style={styles.submitter}>Reported by @{report.reporter_handle} · {new Date(report.created_at).toLocaleDateString()}</Text>
                 <Text style={styles.summary}>{report.target_preview || `Removed target · ${report.target_id}`}</Text>
                 <Text style={styles.story}>{report.reason}</Text>
-                <View style={styles.actions}>
-                  <Pressable onPress={() => resolveReport(report.id, 'dismissed')} style={styles.reject}><Text style={styles.rejectText}>Dismiss</Text></Pressable>
-                  <Pressable onPress={() => resolveReport(report.id, 'actioned')} style={styles.approve}><Ionicons name="checkmark" size={17} color={colors.white} /><Text style={styles.approveText}>Actioned</Text></Pressable>
+                <View style={styles.actionGrid}>
+                  <Pressable onPress={() => resolveReport(report.id, 'dismissed')} style={styles.smallAction}><Text style={styles.rejectText}>Dismiss</Text></Pressable>
+                  {(report.target_type === 'tasting' || report.target_type === 'comment') && <Pressable onPress={() => enforceReport(report, 'remove_content')} style={styles.smallDanger}><Text style={styles.dangerText}>Remove content</Text></Pressable>}
+                  {report.target_type === 'cheese' && <Pressable onPress={() => editReportedCheese(report)} style={styles.smallAction}><Text style={styles.rejectText}>Correct cheese</Text></Pressable>}
+                  {report.target_type === 'cheese' && <Pressable onPress={() => enforceReport(report, 'remove_content')} style={styles.smallDanger}><Text style={styles.dangerText}>Reject cheese</Text></Pressable>}
+                  {report.target_user_id && <Pressable onPress={() => enforceReport(report, 'warn_account')} style={styles.smallAction}><Text style={styles.rejectText}>Warn account</Text></Pressable>}
+                  {report.target_user_id && <Pressable onPress={() => enforceReport(report, 'suspend_account')} style={styles.smallDanger}><Text style={styles.dangerText}>Suspend</Text></Pressable>}
                 </View>
               </View>
             ))}
           </ScrollView>
         ) : (
           <ScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.helper}>Choose who may contribute cheeses. Admins retain full moderation access.</Text>
+            <Text style={styles.helper}>Manage catalog access and enforce community rules. Administrator accounts are protected.</Text>
             {accounts.map((account) => (
               <View key={account.id} style={styles.account}>
                 <View style={styles.accountAvatar}><Text style={styles.accountInitial}>{account.display_name.charAt(0)}</Text></View>
-                <View style={{ flex: 1 }}><Text style={styles.accountName}>{account.display_name}</Text><Text style={styles.submitter}>@{account.handle} · {account.role}</Text></View>
+                <View style={{ flex: 1 }}><Text style={styles.accountName}>{account.display_name}</Text><Text style={styles.submitter}>@{account.handle} · {account.role} · {account.account_status}{account.warning_count ? ` · ${account.warning_count} warning${account.warning_count === 1 ? '' : 's'}` : ''}</Text></View>
                 {account.id !== userId && (
-                  <Pressable onPress={() => changeRole(account.id, account.role === 'cheesemonger' ? 'turophile' : 'cheesemonger')} style={styles.roleToggle}>
-                    <Text style={styles.roleToggleText}>{account.role === 'cheesemonger' ? 'Remove access' : 'Make monger'}</Text>
-                  </Pressable>
+                  <Pressable onPress={() => Alert.alert(`Manage @${account.handle}`, undefined, [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: account.role === 'cheesemonger' ? 'Remove monger access' : 'Make cheesemonger', onPress: () => changeRole(account.id, account.role === 'cheesemonger' ? 'turophile' : 'cheesemonger') },
+                    { text: 'Warn account', onPress: () => setAccountStatus(account, 'warned') },
+                    { text: account.account_status === 'suspended' ? 'Restore account' : 'Suspend account', onPress: () => setAccountStatus(account, account.account_status === 'suspended' ? 'active' : 'suspended') },
+                    { text: 'Remove account', style: 'destructive', onPress: () => removeAccount(account) },
+                  ])} style={styles.roleToggle}><Text style={styles.roleToggleText}>Manage</Text></Pressable>
                 )}
               </View>
             ))}
@@ -299,6 +379,10 @@ const styles = StyleSheet.create({
   reviewPhoto: { width: '100%', aspectRatio: 4 / 3, borderRadius: 14, marginBottom: 13, backgroundColor: colors.cream },
   photoUnavailable: { width: '100%', aspectRatio: 4 / 3, borderRadius: 14, marginBottom: 13, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: 9, marginTop: 16 },
+  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
+  smallAction: { minWidth: '47%', flexGrow: 1, height: 40, borderRadius: 12, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center' },
+  smallDanger: { minWidth: '47%', flexGrow: 1, height: 40, borderRadius: 12, backgroundColor: colors.wine, alignItems: 'center', justifyContent: 'center' },
+  dangerText: { color: colors.white, fontWeight: '800', fontSize: 11 },
   reject: { flex: 1, height: 43, borderRadius: 13, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center' },
   rejectText: { color: colors.wine, fontWeight: '800', fontSize: 12 },
   approve: { flex: 1, height: 43, borderRadius: 13, backgroundColor: colors.wine, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
