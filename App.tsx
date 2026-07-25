@@ -854,7 +854,9 @@ function CheeseModal({ cheese, userId, onSavedChange, onTastingUpdated, onLog, o
           <View style={[styles.detailHero, { backgroundColor: cheese.color }]}>
             <View style={styles.detailOrb} />
             <CheeseArt name={cheese.name} color={cheese.color} size={190} />
-            <Text style={styles.detailStyle}>{cheese.style.toUpperCase()}</Text>
+            <View style={styles.detailStyleWrap}>
+              <Text style={styles.detailStyle} numberOfLines={3}>{cheese.style.toUpperCase()}</Text>
+            </View>
           </View>
           <Text style={styles.detailTitle}>{cheese.name}</Text>
           <Text style={styles.detailMaker}>by {cheese.creamery}</Text>
@@ -1431,7 +1433,8 @@ const styles = StyleSheet.create({
   modalButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   detailHero: { height: 290, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   detailOrb: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(255,255,255,0.18)' },
-  detailStyle: { position: 'absolute', bottom: 18, color: 'rgba(255,255,255,0.9)', fontSize: 9, letterSpacing: 2, fontWeight: '900' },
+  detailStyleWrap: { position: 'absolute', left: 18, right: 18, bottom: 14, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(55,35,20,0.28)' },
+  detailStyle: { color: colors.white, fontSize: 9, lineHeight: 14, letterSpacing: 1.5, fontWeight: '900', textAlign: 'center' },
   detailTitle: { marginTop: 25, paddingHorizontal: 20, color: colors.ink, textAlign: 'center', fontSize: 32, fontWeight: '800', letterSpacing: -1 },
   detailMaker: { color: colors.wine, textAlign: 'center', fontSize: 13, fontWeight: '700', marginTop: 5 },
   detailRatingRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9, marginTop: 13 },
