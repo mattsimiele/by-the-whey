@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, shadow } from './theme';
 
@@ -28,7 +28,8 @@ export function Rating({ value, large = false }: { value: number; large?: boolea
   );
 }
 
-export function CheeseArt({ name, color, size = 72 }: { name: string; color: string; size?: number }) {
+export function CheeseArt({ name, color, size = 72, imageUrl }: { name: string; color: string; size?: number; imageUrl?: string }) {
+  if (imageUrl) return <Image source={{ uri: imageUrl }} style={[styles.cheeseArt, { width: size, height: size }]} resizeMode="cover" />;
   return (
     <View style={[styles.cheeseArt, { width: size, height: size, backgroundColor: color }]}>
       <View style={styles.rindLine} />

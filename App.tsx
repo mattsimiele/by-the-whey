@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   FlatList,
   Image,
@@ -33,6 +34,7 @@ import { Cheese, Post, Role } from './src/data';
 import { isSupabaseConfigured, supabase } from './src/lib/supabase';
 import { chooseReportReason } from './src/reporting';
 import { colors, shadow } from './src/theme';
+import { readCache, writeCache } from './src/cache';
 
 type Tab = 'feed' | 'discover' | 'log' | 'cellar' | 'profile';
 type UserProfile = ProfileRecord & { role: Role; role_approved: boolean; account_status?: 'active' | 'warned' | 'suspended'; moderation_note?: string | null };
@@ -237,7 +239,7 @@ function FeedScreen({ openCheese, openProfile, catalog, feedPosts, profile, user
               {post.photoUrl ? <Image source={{ uri: post.photoUrl }} style={styles.postPhoto} /> : (
                 <>
                   <View style={styles.artGlow} />
-                  <CheeseArt name={cheese.name} color={cheese.color} size={132} />
+                  <CheeseArt name={cheese.name} color={cheese.color} imageUrl={cheese.imageUrl} size={132} />
                 </>
               )}
               {post.photoPending && <View style={styles.pendingPhotoBadge}><Ionicons name="time-outline" size={12} color={colors.white} /><Text style={styles.pendingPhotoText}>Visible to you · awaiting review</Text></View>}
@@ -401,7 +403,7 @@ function DiscoverScreen({ openCheese, catalog, loading, error, unreadCount, onRe
       <View style={styles.cheeseList}>
         {results.map((cheese) => (
           <Pressable key={cheese.id} style={styles.cheeseRow} onPress={() => openCheese(cheese)}>
-            <CheeseArt name={cheese.name} color={cheese.color} size={70} />
+            <CheeseArt name={cheese.name} color={cheese.color} imageUrl={cheese.imageUrl} size={70} />
             <View style={{ flex: 1 }}>
               <Text style={styles.cheeseName}>{cheese.name}</Text>
               <Text style={styles.cheeseMaker}>{cheese.creamery}</Text>
@@ -535,7 +537,7 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
         <Text style={styles.fieldLabel}>WHAT ARE YOU TASTING?</Text>
         {selected && !pickerOpen ? (
           <Pressable style={styles.selectedCheeseSummary} onPress={() => setPickerOpen(true)}>
-            <CheeseArt name={selected.name} color={selected.color} size={46} />
+            <CheeseArt name={selected.name} color={selected.color} imageUrl={selected.imageUrl} size={46} />
             <View style={{ flex: 1 }}><Text style={styles.cheeseName}>{selected.name}</Text><Text style={styles.selectCheeseMaker}>{selected.creamery} · {selected.category}</Text></View>
             <Text style={styles.changeCheese}>Change</Text>
           </Pressable>
@@ -550,7 +552,7 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
             <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={styles.cheesePickerResults} contentContainerStyle={{ gap: 8 }}>
               {cheeseResults.map((cheese) => (
                 <Pressable key={cheese.id} onPress={() => { setSelected(cheese); setCheeseQuery(''); setPickerOpen(false); }} style={[styles.selectCheese, selected?.id === cheese.id && styles.selectCheeseActive]}>
-                  <CheeseArt name={cheese.name} color={cheese.color} size={44} />
+                  <CheeseArt name={cheese.name} color={cheese.color} imageUrl={cheese.imageUrl} size={44} />
                   <View style={{ flex: 1 }}><Text style={styles.selectCheeseName}>{cheese.name}</Text><Text style={styles.selectCheeseMaker}>{cheese.creamery} · {cheese.category}</Text></View>
                   {selected?.id === cheese.id && <View style={styles.selectedCheck}><Ionicons name="checkmark" size={12} color={colors.white} /></View>}
                 </Pressable>
@@ -670,7 +672,7 @@ function CellarScreen({ openCheese, catalog, userId, reload, unreadCount, onNoti
       <View style={styles.cheeseList}>
         {segment === 'Tasted' && entries.map((entry) => (
           <Pressable key={entry.cheese.id} style={styles.cheeseRow} onPress={() => openCheese(entry.cheese)}>
-            <CheeseArt name={entry.cheese.name} color={entry.cheese.color} size={70} />
+            <CheeseArt name={entry.cheese.name} color={entry.cheese.color} imageUrl={entry.cheese.imageUrl} size={70} />
             <View style={{ flex: 1 }}>
               <Text style={styles.cheeseName}>{entry.cheese.name}</Text>
               <Text style={styles.cheeseMaker}>{entry.cheese.creamery}</Text>
@@ -681,7 +683,7 @@ function CellarScreen({ openCheese, catalog, userId, reload, unreadCount, onNoti
         ))}
         {segment === 'Want to try' && savedCheeses.map((cheese) => (
           <Pressable key={cheese.id} style={styles.cheeseRow} onPress={() => openCheese(cheese)}>
-            <CheeseArt name={cheese.name} color={cheese.color} size={70} />
+            <CheeseArt name={cheese.name} color={cheese.color} imageUrl={cheese.imageUrl} size={70} />
             <View style={{ flex: 1 }}>
               <Text style={styles.cheeseName}>{cheese.name}</Text>
               <Text style={styles.cheeseMaker}>{cheese.creamery}</Text>
@@ -848,7 +850,7 @@ function CheeseModal({ cheese, userId, onSavedChange, onTastingUpdated, onLog, o
           </View>
           <View style={[styles.detailHero, { backgroundColor: cheese.color }]}>
             <View style={styles.detailOrb} />
-            <CheeseArt name={cheese.name} color={cheese.color} size={190} />
+            <CheeseArt name={cheese.name} color={cheese.color} imageUrl={cheese.imageUrl} size={190} />
             <View style={styles.detailStyleWrap}>
               <Text style={styles.detailStyle} numberOfLines={3}>{cheese.style.toUpperCase()}</Text>
             </View>
@@ -995,6 +997,7 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [feedError, setFeedError] = useState<string | null>(null);
+  const [usingOfflineData, setUsingOfflineData] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
@@ -1026,16 +1029,24 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
 
   useEffect(() => {
     if (!supabase) return;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const cached = readCache<Cheese[]>('catalog');
+    if (cached?.length) {
+      setCatalog(cached);
+      setCatalogLoading(false);
+    }
     setCatalogLoading(true);
     setCatalogError(null);
     Promise.all([
-      supabase.from('cheeses').select('*').eq('status', 'published').order('name'),
+      supabase.from('cheeses').select('*,cheese_photos(storage_path,moderation_status)').eq('status', 'published').order('name'),
       supabase.rpc('cheese_rating_summary'),
     ]).then(([catalogResult, ratingsResult]) => {
       const { data, error } = catalogResult;
       setCatalogLoading(false);
       if (error) {
         setCatalogError('The cheese catalog could not be loaded. Check your connection and try again.');
+        setUsingOfflineData(Boolean(cached?.length));
+        retryTimer = setTimeout(() => setCatalogReload((value) => value + 1), 12000);
         return;
       }
       if (!data?.length) return;
@@ -1043,7 +1054,10 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
         average: Number(row.average_rating),
         count: Number(row.rating_count),
       }]));
-      const live = data.map((row) => ({
+      const live = data.map((row) => {
+        const catalogPhotos = row.cheese_photos as { storage_path: string; moderation_status: string }[] | null;
+        const approvedPhoto = catalogPhotos?.find((photo) => photo.moderation_status === 'approved');
+        return ({
         id: row.slug,
         name: row.name,
         creamery: row.creamery_name,
@@ -1060,13 +1074,21 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
         logs: ratings.get(row.id)?.count ?? 0,
         color: colors.gold,
         createdAt: row.created_at,
-      } satisfies Cheese));
+        imageUrl: approvedPhoto ? supabase!.storage.from('cheese-photos').getPublicUrl(approvedPhoto.storage_path).data.publicUrl : undefined,
+      } satisfies Cheese);
+      });
       setCatalog(live);
+      writeCache('catalog', live);
+      setUsingOfflineData(false);
     });
+    return () => { if (retryTimer) clearTimeout(retryTimer); };
   }, [catalogReload]);
 
   useEffect(() => {
     if (!supabase || tab !== 'feed') return;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const cached = readCache<Post[]>('feed');
+    if (cached?.length) setFeedPosts(cached);
     setRefreshingFeed(true);
     setFeedError(null);
     supabase
@@ -1079,6 +1101,8 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
         setRefreshingFeed(false);
         if (error) {
           setFeedError('The community feed could not be loaded. Pull to refresh or try again.');
+          setUsingOfflineData(Boolean(cached?.length));
+          retryTimer = setTimeout(() => setFeedReload((value) => value + 1), 12000);
           return;
         }
         if (!data?.length) {
@@ -1112,9 +1136,24 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
             photoUrl: signed?.data?.signedUrl,
             photoPending: photos?.[0]?.moderation_status === 'pending',
           };
-        })).then(setFeedPosts);
+        })).then((posts) => {
+          setFeedPosts(posts);
+          writeCache('feed', posts);
+          setUsingOfflineData(false);
+        });
       });
+    return () => { if (retryTimer) clearTimeout(retryTimer); };
   }, [tab, feedReload]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && usingOfflineData) {
+        setCatalogReload((value) => value + 1);
+        setFeedReload((value) => value + 1);
+      }
+    });
+    return () => subscription.remove();
+  }, [usingOfflineData]);
 
   const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} openProfile={setPublicProfileId} catalog={catalog} feedPosts={feedPosts} profile={profile} userId={userId} refreshing={refreshingFeed} error={feedError} unreadCount={unreadCount} onRefresh={refreshCommunity} onLog={() => { setLogCheese(null); setTab('log'); }} onNotifications={openNotifications} />
     : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} loading={catalogLoading} error={catalogError} unreadCount={unreadCount} onRetry={() => setCatalogReload((value) => value + 1)} onNotifications={openNotifications} />
@@ -1125,6 +1164,7 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="dark" />
+      {usingOfflineData && <View style={styles.offlineBanner}><Ionicons name="cloud-offline-outline" size={14} color={colors.white} /><Text style={styles.offlineBannerText}>Offline — showing saved data. We’ll reconnect automatically.</Text></View>}
       <View style={styles.app}>{screen}</View>
       <View style={styles.tabBar}>
         {tabItems.map((item) => {
@@ -1229,6 +1269,8 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper },
+  offlineBanner: { minHeight: 34, paddingHorizontal: 14, backgroundColor: colors.wine, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  offlineBannerText: { color: colors.white, fontSize: 10, fontWeight: '800' },
   authLoading: { flex: 1, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   resetPage: { flex: 1, backgroundColor: colors.paper, padding: 25, justifyContent: 'center' },
   resetIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },

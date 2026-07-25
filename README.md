@@ -90,9 +90,9 @@ The support contact is `support@thecurdnerd.com`. The Privacy, Terms, Guidelines
 - [x] Core loading, retry, and empty states.
 - [ ] Calculated palate insights.
 - [ ] Comment editing.
-- [ ] Real catalog photography and image moderation.
-- [ ] Offline caching and deeper connection-loss recovery.
-- [ ] Multi-account iPhone and Android testing.
+- [x] Real catalog photography upload, display, and admin image moderation.
+- [x] Persistent offline catalog/feed caching with automatic reconnection recovery.
+- [ ] Complete the physical multi-account iPhone and Android matrix in [`docs/DEVICE_TEST_MATRIX.md`](docs/DEVICE_TEST_MATRIX.md).
 - [ ] TestFlight/internal testing, App Store metadata, screenshots, privacy disclosures, and review submission.
 
 Monetization should follow product validation. Premium palate insights, producer/retailer profiles, affiliate storefront links, and tasteful sponsored discovery placements fit the concept better than an ad-heavy feed.

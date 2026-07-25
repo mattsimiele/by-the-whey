@@ -17,6 +17,7 @@ export type Cheese = {
   logs: number;
   color: string;
   createdAt: string;
+  imageUrl?: string;
 };
 
 export type Post = {

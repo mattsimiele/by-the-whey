@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from './components';
 import { Role } from './data';
@@ -42,6 +44,7 @@ const emptyDraft: Draft = {
 type Submission = Draft & { id: string; slug: string; flavor_profile: string[]; pairings: string[]; profiles: { display_name: string; handle: string } };
 type Report = { id: string; target_type: string; target_id: string; reason: string; reason_code: string | null; status: string; created_at: string; reporter_handle: string; target_preview: string | null; target_user_id: string | null };
 type PhotoReview = { id: string; storage_path: string; created_at: string; signed_url?: string; tasting: { notes: string; rating: number; visibility: string; profile: { display_name: string; handle: string } } };
+type CatalogPhotoReview = { id: string; storage_path: string; created_at: string; public_url?: string; cheese: { name: string; creamery_name: string }; submitter: { display_name: string; handle: string } | null };
 type Account = { id: string; display_name: string; handle: string; role: Role; account_status: 'active' | 'warned' | 'suspended'; warning_count: number; moderation_note: string | null };
 
 export function CatalogManagement({ visible, role, userId, onClose }: { visible: boolean; role: Role; userId: string; onClose: () => void }) {
@@ -53,6 +56,10 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [photos, setPhotos] = useState<PhotoReview[]>([]);
+  const [catalogPhotos, setCatalogPhotos] = useState<CatalogPhotoReview[]>([]);
+  const [catalogCheeses, setCatalogCheeses] = useState<{ id: string; name: string; creamery_name: string }[]>([]);
+  const [catalogPhotoSearch, setCatalogPhotoSearch] = useState('');
+  const [draftPhoto, setDraftPhoto] = useState<{ uri: string; base64: string; mimeType: string } | null>(null);
 
   const loadSubmissions = async () => {
     if (!supabase || role !== 'admin') return;
@@ -92,6 +99,20 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     setPhotos(withUrls as unknown as PhotoReview[]);
   };
 
+  const loadCatalogPhotos = async () => {
+    if (!supabase || role !== 'admin') return;
+    const { data, error } = await supabase.from('cheese_photos')
+      .select('id,storage_path,created_at,cheese:cheese_id(name,creamery_name),submitter:submitted_by(display_name,handle)')
+      .eq('moderation_status', 'pending').order('created_at');
+    if (error) return Alert.alert('Could not load catalog photo review', error.message);
+    setCatalogPhotos((data ?? []).map((item) => ({
+      ...item,
+      public_url: supabase!.storage.from('cheese-photos').getPublicUrl(item.storage_path).data.publicUrl,
+    })) as unknown as CatalogPhotoReview[]);
+    const { data: cheeses } = await supabase.from('cheeses').select('id,name,creamery_name').eq('status', 'published').order('name');
+    setCatalogCheeses(cheeses ?? []);
+  };
+
   useEffect(() => {
     if (visible) {
       setTab(role === 'admin' ? 'review' : 'submit');
@@ -99,10 +120,21 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
       loadAccounts();
       loadReports();
       loadPhotos();
+      loadCatalogPhotos();
     }
   }, [visible, role]);
 
   const setField = (field: keyof Draft, value: string) => setDraft((current) => ({ ...current, [field]: value }));
+
+  const chooseDraftPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return Alert.alert('Photo permission needed', 'Allow photo access to add catalog photography.');
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.85, base64: true });
+    if (!result.canceled && result.assets[0]?.base64) {
+      const asset = result.assets[0];
+      setDraftPhoto({ uri: asset.uri, base64: asset.base64!, mimeType: asset.mimeType ?? 'image/jpeg' });
+    }
+  };
 
   const submit = async () => {
     if (!supabase) return;
@@ -119,12 +151,37 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
       submitted_by: userId,
       approved_by: role === 'admin' && editingCheeseId ? userId : null,
     };
-    const { error } = editingCheeseId
-      ? await supabase.from('cheeses').update(payload).eq('id', editingCheeseId)
-      : await supabase.from('cheeses').insert(payload);
+    const result = editingCheeseId
+      ? await supabase.from('cheeses').update(payload).eq('id', editingCheeseId).select('id').single()
+      : await supabase.from('cheeses').insert(payload).select('id').single();
+    const { error } = result;
+    if (error) {
+      setSaving(false);
+      return Alert.alert(error.message.includes('CONTENT_REVIEW_REQUIRED') ? 'Submission needs revision' : 'Could not submit cheese', error.message.includes('CONTENT_REVIEW_REQUIRED') ? 'Please remove potentially harmful, explicit, or spam-like language and try again.' : error.message);
+    }
+    if (draftPhoto && result.data?.id) {
+      const extension = draftPhoto.mimeType === 'image/png' ? 'png' : draftPhoto.mimeType === 'image/webp' ? 'webp' : 'jpg';
+      const storagePath = `${userId}/${result.data.id}/${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage.from('cheese-photos').upload(storagePath, decode(draftPhoto.base64), { contentType: draftPhoto.mimeType });
+      if (uploadError) {
+        setSaving(false);
+        return Alert.alert('Cheese saved, but photo upload failed', uploadError.message);
+      }
+      const { error: recordError } = await supabase.from('cheese_photos').insert({
+        cheese_id: result.data.id, storage_path: storagePath, submitted_by: userId,
+        moderation_status: role === 'admin' ? 'approved' : 'pending',
+        reviewed_by: role === 'admin' ? userId : null,
+        reviewed_at: role === 'admin' ? new Date().toISOString() : null,
+      });
+      if (recordError) {
+        await supabase.storage.from('cheese-photos').remove([storagePath]);
+        setSaving(false);
+        return Alert.alert('Cheese saved, but photo could not be attached', recordError.message);
+      }
+    }
     setSaving(false);
-    if (error) return Alert.alert(error.message.includes('CONTENT_REVIEW_REQUIRED') ? 'Submission needs revision' : 'Could not submit cheese', error.message.includes('CONTENT_REVIEW_REQUIRED') ? 'Please remove potentially harmful, explicit, or spam-like language and try again.' : error.message);
     setDraft(emptyDraft);
+    setDraftPhoto(null);
     setEditingCheeseId(null);
     Alert.alert(editingCheeseId ? 'Cheese corrected' : 'Submitted for review', editingCheeseId ? 'The corrected catalog entry is now published.' : 'An administrator can now review this cheese for publication.');
     if (role === 'admin') {
@@ -236,6 +293,42 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     setPhotos((current) => current.filter((item) => item.id !== photo.id));
   };
 
+  const reviewCatalogPhoto = async (photo: CatalogPhotoReview, approve: boolean) => {
+    if (!supabase) return;
+    if (approve) {
+      const { error } = await supabase.from('cheese_photos').update({ moderation_status: 'approved', reviewed_by: userId, reviewed_at: new Date().toISOString() }).eq('id', photo.id);
+      if (error) return Alert.alert('Could not approve catalog photo', error.message);
+    } else {
+      const { error: storageError } = await supabase.storage.from('cheese-photos').remove([photo.storage_path]);
+      if (storageError) return Alert.alert('Could not remove catalog photo', storageError.message);
+      const { error } = await supabase.from('cheese_photos').delete().eq('id', photo.id);
+      if (error) return Alert.alert('Could not reject catalog photo', error.message);
+    }
+    setCatalogPhotos((current) => current.filter((item) => item.id !== photo.id));
+  };
+
+  const addExistingCatalogPhoto = async (cheese: { id: string; name: string }) => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return Alert.alert('Photo permission needed', 'Allow photo access to add catalog photography.');
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.85, base64: true });
+    const asset = result.canceled ? null : result.assets[0];
+    if (!asset?.base64) return;
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+    const storagePath = `${userId}/${cheese.id}/${Date.now()}.${extension}`;
+    const { error: uploadError } = await supabase!.storage.from('cheese-photos').upload(storagePath, decode(asset.base64), { contentType: mimeType });
+    if (uploadError) return Alert.alert('Could not upload catalog photo', uploadError.message);
+    const { error } = await supabase!.from('cheese_photos').insert({
+      cheese_id: cheese.id, storage_path: storagePath, submitted_by: userId,
+      moderation_status: 'approved', reviewed_by: userId, reviewed_at: new Date().toISOString(),
+    });
+    if (error) {
+      await supabase!.storage.from('cheese-photos').remove([storagePath]);
+      return Alert.alert('Could not attach catalog photo', error.message);
+    }
+    Alert.alert('Catalog photo added', `${cheese.name} will use the new photo after the app refreshes.`);
+  };
+
   const fields: { key: keyof Draft; label: string; placeholder: string; multiline?: boolean }[] = [
     { key: 'name', label: 'Cheese name', placeholder: 'Shelburne 2 Year' },
     { key: 'creamery_name', label: 'Creamery', placeholder: 'Shelburne Farms' },
@@ -274,6 +367,10 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
                 <TextInput value={draft[field.key]} onChangeText={(value) => setField(field.key, value)} placeholder={field.placeholder} placeholderTextColor="#9B958A" multiline={field.multiline} style={[styles.input, field.multiline && styles.multiline]} />
               </View>
             ))}
+            <Text style={styles.label}>CATALOG PHOTO</Text>
+            {draftPhoto ? <Image source={{ uri: draftPhoto.uri }} style={styles.reviewPhoto} /> : null}
+            <Pressable onPress={chooseDraftPhoto} style={styles.photoPicker}><Ionicons name="image-outline" size={18} color={colors.wine} /><Text style={styles.rejectText}>{draftPhoto ? 'Choose a different photo' : 'Add real catalog photo'}</Text></Pressable>
+            <Text style={styles.helper}>{role === 'admin' ? 'Administrator photos publish immediately.' : 'The photo stays private until an administrator approves it.'}</Text>
             {saving ? <ActivityIndicator color={colors.wine} /> : <PrimaryButton label={editingCheeseId ? 'Save correction' : 'Submit for review'} icon="arrow-forward" onPress={submit} />}
           </ScrollView>
         ) : tab === 'review' ? (
@@ -295,7 +392,28 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
           </ScrollView>
         ) : tab === 'photos' ? (
           <ScrollView contentContainerStyle={styles.content}>
-            {!photos.length ? <View style={styles.empty}><Ionicons name="images-outline" size={40} color={colors.sage} /><Text style={styles.emptyTitle}>Photo queue is clear</Text><Text style={styles.helper}>New tasting photos will remain off the public feed until approved.</Text></View> : photos.map((photo) => (
+            <Text style={styles.queueHeading}>Add to existing catalog</Text>
+            <TextInput value={catalogPhotoSearch} onChangeText={setCatalogPhotoSearch} placeholder="Search cheeses…" placeholderTextColor="#9B958A" style={styles.input} />
+            {catalogPhotoSearch.trim().length > 1 && catalogCheeses.filter((item) => `${item.name} ${item.creamery_name}`.toLowerCase().includes(catalogPhotoSearch.trim().toLowerCase())).slice(0, 8).map((item) => (
+              <View key={item.id} style={styles.catalogPhotoRow}>
+                <View style={{ flex: 1 }}><Text style={styles.accountName}>{item.name}</Text><Text style={styles.submitter}>{item.creamery_name}</Text></View>
+                <Pressable onPress={() => addExistingCatalogPhoto(item)} style={styles.roleToggle}><Text style={styles.roleToggleText}>Add photo</Text></Pressable>
+              </View>
+            ))}
+            <Text style={styles.queueHeading}>Catalog photography</Text>
+            {!catalogPhotos.length ? <Text style={styles.helper}>No catalog photos are awaiting review.</Text> : catalogPhotos.map((photo) => (
+              <View key={photo.id} style={styles.submission}>
+                {photo.public_url ? <Image source={{ uri: photo.public_url }} style={styles.reviewPhoto} /> : null}
+                <Text style={styles.submissionTitle}>{photo.cheese.name}</Text>
+                <Text style={styles.submitter}>{photo.cheese.creamery_name}{photo.submitter ? ` · submitted by @${photo.submitter.handle}` : ''}</Text>
+                <View style={styles.actions}>
+                  <Pressable onPress={() => reviewCatalogPhoto(photo, false)} style={styles.reject}><Text style={styles.rejectText}>Reject</Text></Pressable>
+                  <Pressable onPress={() => reviewCatalogPhoto(photo, true)} style={styles.approve}><Text style={styles.approveText}>Approve</Text></Pressable>
+                </View>
+              </View>
+            ))}
+            <Text style={styles.queueHeading}>Tasting photography</Text>
+            {!photos.length ? <Text style={styles.helper}>No tasting photos are awaiting review.</Text> : photos.map((photo) => (
               <View key={photo.id} style={styles.submission}>
                 {photo.signed_url ? <Image source={{ uri: photo.signed_url }} style={styles.reviewPhoto} /> : <View style={styles.photoUnavailable}><Ionicons name="image-outline" size={30} color={colors.muted} /></View>}
                 <Text style={styles.submissionTitle}>{photo.tasting.profile.display_name}</Text>
@@ -377,6 +495,9 @@ const styles = StyleSheet.create({
   story: { color: colors.ink, fontSize: 12, lineHeight: 18, marginTop: 12 },
   pills: { color: colors.wine, fontSize: 10, fontWeight: '700', marginTop: 11 },
   reviewPhoto: { width: '100%', aspectRatio: 4 / 3, borderRadius: 14, marginBottom: 13, backgroundColor: colors.cream },
+  photoPicker: { minHeight: 46, borderRadius: 13, backgroundColor: colors.blush, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 },
+  queueHeading: { color: colors.ink, fontSize: 18, fontWeight: '800', marginTop: 8, marginBottom: 12 },
+  catalogPhotoRow: { minHeight: 58, borderBottomWidth: 1, borderBottomColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
   photoUnavailable: { width: '100%', aspectRatio: 4 / 3, borderRadius: 14, marginBottom: 13, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: 9, marginTop: 16 },
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
