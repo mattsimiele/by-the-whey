@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  Share,
   ScrollView,
   StyleSheet,
   Text,
@@ -57,11 +58,26 @@ function AppHeader({ title, subtitle, onNotifications }: { title?: string; subti
   );
 }
 
-function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshing, onRefresh, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; feedPosts: Post[]; profile: UserProfile | null; userId?: string; refreshing: boolean; onRefresh: () => void; onNotifications: () => void }) {
+function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshing, onRefresh, onLog, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; feedPosts: Post[]; profile: UserProfile | null; userId?: string; refreshing: boolean; onRefresh: () => void; onLog: () => void; onNotifications: () => void }) {
   const [liked, setLiked] = useState<string[]>([]);
   const [following, setFollowing] = useState<string[]>([]);
   const [commentPost, setCommentPost] = useState<Post | null>(null);
   const initials = (profile?.display_name ?? 'Guest').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+
+  useEffect(() => {
+    if (!supabase || !userId) {
+      setLiked([]);
+      setFollowing([]);
+      return;
+    }
+    Promise.all([
+      supabase.from('likes').select('tasting_id').eq('user_id', userId),
+      supabase.from('follows').select('following_id').eq('follower_id', userId),
+    ]).then(([likesResult, followsResult]) => {
+      setLiked((likesResult.data ?? []).map((row) => row.tasting_id));
+      setFollowing((followsResult.data ?? []).map((row) => row.following_id));
+    });
+  }, [userId, feedPosts]);
 
   return (
     <ScrollView
@@ -78,7 +94,7 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
         <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
       </View>
 
-      <View style={styles.promptCard}>
+      <Pressable style={styles.promptCard} onPress={onLog}>
         <View style={styles.promptTop}>
           <View style={styles.promptIcon}><Ionicons name="restaurant-outline" size={20} color={colors.wine} /></View>
           <View style={{ flex: 1 }}>
@@ -87,9 +103,9 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
           </View>
           <Ionicons name="arrow-forward" size={20} color={colors.wine} />
         </View>
-      </View>
+      </Pressable>
 
-      <SectionHeader title="From your circle" action="See all" />
+      <SectionHeader title="From your circle" />
       {!feedPosts.length && (
         <View style={styles.emptyState}>
           <Ionicons name="people-outline" size={36} color={colors.sage} />
@@ -144,7 +160,7 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
             </Pressable>
             <View style={styles.postBody}>
               <View style={styles.postCheeseRow}>
-                <View>
+                <View style={styles.postCheeseInfo}>
                   <Text style={styles.postCheese}>{cheese.name}</Text>
                   <Text style={styles.postMaker}>{cheese.creamery} · {cheese.location}</Text>
                 </View>
@@ -157,7 +173,7 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
               </View>
               <View style={styles.socialRow}>
                 <Pressable style={styles.socialAction} onPress={async () => {
-                  if (userId && supabase && post.id.includes('-')) {
+                  if (userId && supabase) {
                     const action = isLiked
                       ? supabase.from('likes').delete().eq('user_id', userId).eq('tasting_id', post.id)
                       : supabase.from('likes').upsert({ user_id: userId, tasting_id: post.id });
@@ -172,23 +188,25 @@ function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshin
                   <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={21} color={isLiked ? colors.wine : colors.ink} />
                   <Text style={[styles.socialText, isLiked && { color: colors.wine }]}>{post.likes + (isLiked ? 1 : 0)}</Text>
                 </Pressable>
-                <Pressable style={styles.socialAction} onPress={() => post.id.includes('-') ? setCommentPost(post) : Alert.alert('Prototype post', 'Comments are available on live community tastings.')}>
+                <Pressable style={styles.socialAction} onPress={() => setCommentPost(post)}>
                   <Ionicons name="chatbubble-outline" size={19} color={colors.ink} />
                   <Text style={styles.socialText}>{post.comments}</Text>
                 </Pressable>
                 <View style={{ flex: 1 }} />
-                <Ionicons name="share-outline" size={20} color={colors.ink} />
+                <Pressable onPress={() => Share.share({ message: `${post.user} rated ${cheese.name} ${post.rating.toFixed(1)} stars on By the Whey: “${post.note}”` })}>
+                  <Ionicons name="share-outline" size={20} color={colors.ink} />
+                </Pressable>
               </View>
             </View>
           </View>
         );
       })}
-      <CommentsModal post={commentPost} userId={userId} onClose={() => setCommentPost(null)} />
+      <CommentsModal post={commentPost} userId={userId} onCommented={onRefresh} onClose={() => setCommentPost(null)} />
     </ScrollView>
   );
 }
 
-function CommentsModal({ post, userId, onClose }: { post: Post | null; userId?: string; onClose: () => void }) {
+function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | null; userId?: string; onCommented: () => void; onClose: () => void }) {
   const [comments, setComments] = useState<{ id: string; body: string; created_at: string; profiles: { display_name: string; handle: string } }[]>([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -209,6 +227,7 @@ function CommentsModal({ post, userId, onClose }: { post: Post | null; userId?: 
     if (error) return Alert.alert('Could not comment', error.message);
     setBody('');
     load();
+    onCommented();
   };
 
   return (
@@ -293,12 +312,13 @@ function DiscoverScreen({ openCheese, catalog, onNotifications }: { openCheese: 
   );
 }
 
-function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplete: () => void; catalog: Cheese[]; userId?: string; onNotifications: () => void }) {
+function LogScreen({ onComplete, catalog, initialCheese, userId, onNotifications }: { onComplete: () => void; catalog: Cheese[]; initialCheese: Cheese | null; userId?: string; onNotifications: () => void }) {
   const [selected, setSelected] = useState<Cheese | null>(null);
   const [cheeseQuery, setCheeseQuery] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [rating, setRating] = useState(4.5);
   const [note, setNote] = useState('');
+  const [locationName, setLocationName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [photo, setPhoto] = useState<{ uri: string; base64: string; mimeType: string } | null>(null);
@@ -307,6 +327,13 @@ function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplet
     if (!normalized) return catalog.slice(0, 12);
     return catalog.filter((cheese) => `${cheese.name} ${cheese.creamery} ${cheese.location} ${cheese.category}`.toLowerCase().includes(normalized)).slice(0, 30);
   }, [catalog, cheeseQuery]);
+
+  useEffect(() => {
+    if (!initialCheese) return;
+    setSelected(initialCheese);
+    setCheeseQuery('');
+    setPickerOpen(false);
+  }, [initialCheese]);
 
   const pickPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -349,6 +376,7 @@ function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplet
       cheese_id: cheese.id,
       rating,
       notes: note.trim(),
+      location_name: locationName.trim() || null,
       visibility: isPublic ? 'public' : 'private',
     }).select('id').single();
     if (!error && tasting && photo) {
@@ -361,6 +389,7 @@ function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplet
         setSaving(false);
         Alert.alert('Tasting saved without photo', uploadError.message);
         setNote('');
+        setLocationName('');
         setPhoto(null);
         onComplete();
         return;
@@ -374,6 +403,7 @@ function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplet
     }
     Alert.alert('Tasting logged', `${selected.name} has been added to your cheese diary${isPublic ? ' and shared with your circle' : ''}.`);
     setNote('');
+    setLocationName('');
     setPhoto(null);
     onComplete();
   };
@@ -442,7 +472,10 @@ function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplet
             <View style={{ flex: 1 }}><Text style={styles.addOnText}>{photo ? 'Photo selected' : 'Add photo'}</Text>{photo && <Text style={styles.addOnSub}>Tap to choose a different image</Text>}</View>
             <Ionicons name="chevron-forward" size={17} color={colors.muted} />
           </Pressable>
-          <View style={styles.addOn}><Ionicons name="location-outline" size={21} color={colors.wine} /><Text style={styles.addOnText}>Add location</Text><Ionicons name="chevron-forward" size={17} color={colors.muted} /></View>
+          <View style={styles.locationEditor}>
+            <Ionicons name="location-outline" size={21} color={colors.wine} />
+            <TextInput value={locationName} onChangeText={setLocationName} placeholder="Where did you taste it? (optional)" placeholderTextColor="#9B958A" style={styles.locationInput} />
+          </View>
           <Pressable style={styles.addOn} onPress={() => setIsPublic(!isPublic)}>
             <Ionicons name={isPublic ? 'people-outline' : 'lock-closed-outline'} size={21} color={colors.wine} />
             <View style={{ flex: 1 }}><Text style={styles.addOnText}>{isPublic ? 'Share with your circle' : 'Keep this tasting private'}</Text><Text style={styles.addOnSub}>Tap to change visibility</Text></View>
@@ -612,17 +645,26 @@ function ProfileScreen({ profile, signedIn, onManageCatalog, onNotifications }: 
   );
 }
 
-function CheeseModal({ cheese, userId, onSavedChange, onClose }: { cheese: Cheese | null; userId?: string; onSavedChange: () => void; onClose: () => void }) {
+type PersonalTasting = { id: string; rating: number; notes: string; location_name: string | null; created_at: string };
+
+function CheeseModal({ cheese, userId, onSavedChange, onLog, onClose }: { cheese: Cheese | null; userId?: string; onSavedChange: () => void; onLog: (cheese: Cheese) => void; onClose: () => void }) {
   const [saved, setSaved] = useState(false);
   const [savingBookmark, setSavingBookmark] = useState(false);
+  const [personalTastings, setPersonalTastings] = useState<PersonalTasting[]>([]);
 
   useEffect(() => {
     setSaved(false);
+    setPersonalTastings([]);
     if (!supabase || !userId || !cheese) return;
     supabase.from('cheeses').select('id').eq('slug', cheese.id).single().then(({ data }) => {
       if (!data) return;
-      supabase!.from('saved_cheeses').select('cheese_id').eq('user_id', userId).eq('cheese_id', data.id).maybeSingle()
-        .then(({ data: savedRow }) => setSaved(Boolean(savedRow)));
+      Promise.all([
+        supabase!.from('saved_cheeses').select('cheese_id').eq('user_id', userId).eq('cheese_id', data.id).maybeSingle(),
+        supabase!.from('tastings').select('id,rating,notes,location_name,created_at').eq('user_id', userId).eq('cheese_id', data.id).order('created_at', { ascending: false }),
+      ]).then(([savedResult, tastingsResult]) => {
+        setSaved(Boolean(savedResult.data));
+        setPersonalTastings((tastingsResult.data ?? []).map((row) => ({ ...row, rating: Number(row.rating) })));
+      });
     });
   }, [cheese?.id, userId]);
 
@@ -651,6 +693,7 @@ function CheeseModal({ cheese, userId, onSavedChange, onClose }: { cheese: Chees
   };
 
   if (!cheese) return null;
+  const personalAverage = personalTastings.length ? personalTastings.reduce((sum, tasting) => sum + tasting.rating, 0) / personalTastings.length : null;
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.modalSafe}>
@@ -670,8 +713,9 @@ function CheeseModal({ cheese, userId, onSavedChange, onClose }: { cheese: Chees
           <Text style={styles.detailTitle}>{cheese.name}</Text>
           <Text style={styles.detailMaker}>by {cheese.creamery}</Text>
           <View style={styles.detailRatingRow}>
-            <Rating value={cheese.rating} large />
-            <Text style={styles.detailLogs}>from {cheese.logs.toLocaleString()} tastings</Text>
+            {personalAverage === null ? <Text style={styles.detailLogs}>You haven’t tasted this cheese yet.</Text> : (
+              <><Rating value={personalAverage} large /><Text style={styles.detailLogs}>your average from {personalTastings.length} {personalTastings.length === 1 ? 'tasting' : 'tastings'}</Text></>
+            )}
           </View>
           <Text style={styles.detailDescription}>{cheese.story}</Text>
           <View style={styles.facts}>
@@ -687,10 +731,24 @@ function CheeseModal({ cheese, userId, onSavedChange, onClose }: { cheese: Chees
             <SectionHeader title="Pair it with" />
             <View style={styles.detailNotes}>{cheese.pairings.map((pairing) => <View key={pairing} style={styles.pairingNote}><Text style={styles.pairingNoteText}>{pairing}</Text></View>)}</View>
           </View>
+          {personalTastings.length > 0 && (
+            <View style={styles.detailSection}>
+              <SectionHeader title="Your tastings" />
+              <View style={styles.personalTastingList}>
+                {personalTastings.map((tasting) => (
+                  <View key={tasting.id} style={styles.personalTastingCard}>
+                    <View style={styles.personalTastingHeader}><Rating value={tasting.rating} /><Text style={styles.personalTastingDate}>{new Date(tasting.created_at).toLocaleDateString()}</Text></View>
+                    {tasting.notes ? <Text style={styles.personalTastingNotes}>{tasting.notes}</Text> : <Text style={styles.personalTastingEmpty}>No tasting notes added.</Text>}
+                    {tasting.location_name ? <Text style={styles.personalTastingLocation}><Ionicons name="location-outline" size={12} color={colors.muted} /> {tasting.location_name}</Text> : null}
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
           <View style={styles.detailActions}>
             <PrimaryButton label={saved ? 'Saved for later' : 'Save for later'} icon={saved ? 'bookmark' : 'bookmark-outline'} secondary onPress={toggleSaved} />
             <View style={{ height: 10 }} />
-            <PrimaryButton label="Log a tasting" icon="add-circle-outline" onPress={() => Alert.alert('Ready to taste', `Open the Log tab to record your ${cheese.name}.`)} />
+            <PrimaryButton label="Log a tasting" icon="add-circle-outline" onPress={() => onLog(cheese)} />
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -777,6 +835,7 @@ function PasswordResetModal({ visible, onClose }: { visible: boolean; onClose: (
 function Root({ profile, signedIn, userId }: { profile: UserProfile | null; signedIn: boolean; userId?: string }) {
   const [tab, setTab] = useState<Tab>('feed');
   const [selectedCheese, setSelectedCheese] = useState<Cheese | null>(null);
+  const [logCheese, setLogCheese] = useState<Cheese | null>(null);
   const [catalog, setCatalog] = useState<Cheese[]>([]);
   const [feedPosts, setFeedPosts] = useState<Post[]>([]);
   const [feedReload, setFeedReload] = useState(0);
@@ -817,7 +876,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
     setRefreshingFeed(true);
     supabase
       .from('tastings')
-      .select('id,rating,notes,location_name,created_at,user_id,cheese_id,profiles:user_id(display_name,handle,role),cheeses:cheese_id(slug,name),tasting_photos(storage_path)')
+      .select('id,rating,notes,location_name,created_at,user_id,cheese_id,profiles:user_id(display_name,handle,role),cheeses:cheese_id(slug,name),tasting_photos(storage_path),likes(count),comments(count)')
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
       .limit(30)
@@ -832,6 +891,8 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
           const author = row.profiles as unknown as { display_name: string; handle: string; role: Role };
           const cheese = row.cheeses as unknown as { slug: string; name: string };
           const photos = row.tasting_photos as unknown as { storage_path: string }[];
+          const likes = row.likes as unknown as { count: number }[];
+          const comments = row.comments as unknown as { count: number }[];
           const signed = photos?.[0] ? await supabase!.storage.from('tasting-photos').createSignedUrl(photos[0].storage_path, 3600) : null;
           const initials = author.display_name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
           const minutes = Math.max(1, Math.round((Date.now() - new Date(row.created_at).getTime()) / 60000));
@@ -847,17 +908,17 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
             note: row.notes || `Tasted ${cheese.name}.`,
             place: row.location_name || 'Location not added',
             time: minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h`,
-            likes: 0,
-            comments: 0,
+            likes: likes?.[0]?.count ?? 0,
+            comments: comments?.[0]?.count ?? 0,
             photoUrl: signed?.data?.signedUrl,
           };
         })).then(setFeedPosts);
       });
   }, [tab, feedReload]);
 
-  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} profile={profile} userId={userId} refreshing={refreshingFeed} onRefresh={() => setFeedReload((value) => value + 1)} onNotifications={openNotifications} />
+  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} profile={profile} userId={userId} refreshing={refreshingFeed} onRefresh={() => setFeedReload((value) => value + 1)} onLog={() => { setLogCheese(null); setTab('log'); }} onNotifications={openNotifications} />
     : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} onNotifications={openNotifications} />
-    : tab === 'log' ? <LogScreen onComplete={() => { setFeedReload((value) => value + 1); setTab('feed'); }} catalog={catalog} userId={userId} onNotifications={openNotifications} />
+    : tab === 'log' ? <LogScreen onComplete={() => { setFeedReload((value) => value + 1); setLogCheese(null); setTab('feed'); }} catalog={catalog} initialCheese={logCheese} userId={userId} onNotifications={openNotifications} />
     : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} userId={userId} reload={feedReload + savedReload} onNotifications={openNotifications} />
     : <ProfileScreen profile={profile} signedIn={signedIn} onManageCatalog={() => setCatalogManagementOpen(true)} onNotifications={openNotifications} />;
 
@@ -870,7 +931,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
           const active = tab === item.id;
           const isLog = item.id === 'log';
           return (
-            <Pressable key={item.id} onPress={() => setTab(item.id)} style={styles.tabItem}>
+            <Pressable key={item.id} onPress={() => { if (item.id === 'log') setLogCheese(null); setTab(item.id); }} style={styles.tabItem}>
               <View style={isLog ? styles.logButton : undefined}>
                 <Ionicons name={active ? item.active : item.icon} size={isLog ? 27 : 22} color={isLog ? colors.white : active ? colors.wine : colors.muted} />
               </View>
@@ -879,7 +940,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
           );
         })}
       </View>
-      <CheeseModal cheese={selectedCheese} userId={userId} onSavedChange={() => setSavedReload((value) => value + 1)} onClose={() => setSelectedCheese(null)} />
+      <CheeseModal cheese={selectedCheese} userId={userId} onSavedChange={() => setSavedReload((value) => value + 1)} onLog={(cheese) => { setSelectedCheese(null); setLogCheese(cheese); setTab('log'); }} onClose={() => setSelectedCheese(null)} />
       {profile && userId && <CatalogManagement visible={catalogManagementOpen} role={profile.role} userId={userId} onClose={() => { setCatalogManagementOpen(false); setCatalogReload((value) => value + 1); }} />}
       <NotificationsModal visible={notificationsOpen} userId={userId} onClose={() => setNotificationsOpen(false)} />
     </SafeAreaView>
@@ -996,7 +1057,8 @@ const styles = StyleSheet.create({
   artLabelTitle: { fontSize: 18, color: colors.ink, fontWeight: '800', marginTop: 2 },
   artLabelMaker: { fontSize: 9, color: colors.muted, marginTop: 1 },
   postBody: { padding: 16 },
-  postCheeseRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  postCheeseRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  postCheeseInfo: { flex: 1, minWidth: 0 },
   postCheese: { fontSize: 18, fontWeight: '800', color: colors.ink },
   postMaker: { color: colors.muted, fontSize: 10, marginTop: 3 },
   postNote: { color: '#4D4942', fontSize: 13, lineHeight: 20, marginTop: 13 },
@@ -1071,6 +1133,8 @@ const styles = StyleSheet.create({
   noteChipText: { color: colors.wine, fontSize: 10, fontWeight: '700' },
   addOns: { marginVertical: 20, borderTopWidth: 1, borderTopColor: colors.line },
   addOn: { minHeight: 55, borderBottomWidth: 1, borderBottomColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  locationEditor: { minHeight: 55, borderBottomWidth: 1, borderBottomColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  locationInput: { flex: 1, color: colors.ink, fontSize: 13, paddingVertical: 12 },
   addOnText: { flex: 1, color: colors.ink, fontWeight: '700', fontSize: 13 },
   addOnSub: { color: colors.muted, fontSize: 9, marginTop: 2 },
   photoThumb: { width: 38, height: 38, borderRadius: 10 },
@@ -1143,4 +1207,11 @@ const styles = StyleSheet.create({
   pairingNote: { paddingHorizontal: 13, paddingVertical: 9, backgroundColor: colors.blush, borderRadius: 16 },
   pairingNoteText: { color: colors.wine, fontSize: 11, fontWeight: '700' },
   detailActions: { padding: 20 },
+  personalTastingList: { gap: 10, paddingHorizontal: 20 },
+  personalTastingCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 14 },
+  personalTastingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  personalTastingDate: { color: colors.muted, fontSize: 10, fontWeight: '700' },
+  personalTastingNotes: { color: colors.ink, fontSize: 12, lineHeight: 18, marginTop: 9 },
+  personalTastingEmpty: { color: colors.muted, fontSize: 11, fontStyle: 'italic', marginTop: 9 },
+  personalTastingLocation: { color: colors.muted, fontSize: 10, marginTop: 8 },
 });
