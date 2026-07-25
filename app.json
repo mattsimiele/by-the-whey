@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "By the Whey",
+    "slug": "by-the-whey",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "bythewhey",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.thecurdnerd.bythewhey"
+    },
+    "android": {
+      "package": "com.thecurdnerd.bythewhey",
+      "adaptiveIcon": {
+        "backgroundColor": "#F6F0E3"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
