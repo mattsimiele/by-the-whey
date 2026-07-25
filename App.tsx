@@ -301,7 +301,12 @@ function DiscoverScreen({ openCheese, catalog, onNotifications }: { openCheese: 
               </View>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 12 }}>
-              <Rating value={cheese.rating} />
+              {cheese.logs > 0 ? (
+                <View style={styles.communityRating}>
+                  <Rating value={cheese.rating} />
+                  <Text style={styles.communityRatingCount}>{cheese.logs} {cheese.logs === 1 ? 'rating' : 'ratings'}</Text>
+                </View>
+              ) : <Text style={styles.unratedText}>Not rated yet</Text>}
               <Ionicons name="chevron-forward" size={17} color={colors.muted} />
             </View>
           </Pressable>
@@ -853,8 +858,16 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.from('cheeses').select('*').eq('status', 'published').order('name').then(({ data, error }) => {
+    Promise.all([
+      supabase.from('cheeses').select('*').eq('status', 'published').order('name'),
+      supabase.rpc('cheese_rating_summary'),
+    ]).then(([catalogResult, ratingsResult]) => {
+      const { data, error } = catalogResult;
       if (error || !data?.length) return;
+      const ratings = new Map<string, { average: number; count: number }>((ratingsResult.data ?? []).map((row: { cheese_id: string; average_rating: number | string; rating_count: number | string }) => [row.cheese_id, {
+        average: Number(row.average_rating),
+        count: Number(row.rating_count),
+      }]));
       const live = data.map((row) => ({
         id: row.slug,
         name: row.name,
@@ -868,8 +881,8 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
         flavorProfile: row.flavor_profile,
         story: row.story_notes,
         pairings: row.pairings,
-        rating: 0,
-        logs: 0,
+        rating: ratings.get(row.id)?.average ?? 0,
+        logs: ratings.get(row.id)?.count ?? 0,
         color: colors.gold,
       } satisfies Cheese));
       setCatalog(live);
@@ -923,7 +936,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
 
   const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} profile={profile} userId={userId} refreshing={refreshingFeed} onRefresh={() => setFeedReload((value) => value + 1)} onLog={() => { setLogCheese(null); setTab('log'); }} onNotifications={openNotifications} />
     : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} onNotifications={openNotifications} />
-    : tab === 'log' ? <LogScreen onComplete={() => { setFeedReload((value) => value + 1); setLogCheese(null); setTab('feed'); }} catalog={catalog} initialCheese={logCheese} userId={userId} onNotifications={openNotifications} />
+    : tab === 'log' ? <LogScreen onComplete={() => { setFeedReload((value) => value + 1); setCatalogReload((value) => value + 1); setLogCheese(null); setTab('feed'); }} catalog={catalog} initialCheese={logCheese} userId={userId} onNotifications={openNotifications} />
     : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} userId={userId} reload={feedReload + savedReload} onNotifications={openNotifications} />
     : <ProfileScreen profile={profile} signedIn={signedIn} onManageCatalog={() => setCatalogManagementOpen(true)} onNotifications={openNotifications} />;
 
@@ -1121,6 +1134,9 @@ const styles = StyleSheet.create({
   cheeseMaker: { color: colors.wine, fontSize: 10, fontWeight: '700', marginTop: 3 },
   cheeseMetaRow: { flexDirection: 'row', marginTop: 7 },
   cheeseMeta: { color: colors.muted, fontSize: 10 },
+  communityRating: { alignItems: 'flex-end', gap: 3 },
+  communityRatingCount: { color: colors.muted, fontSize: 8, fontWeight: '700' },
+  unratedText: { color: colors.muted, fontSize: 9, fontStyle: 'italic' },
   fieldLabel: { color: colors.muted, fontWeight: '900', fontSize: 9, letterSpacing: 1.5, marginTop: 18, marginBottom: 10 },
   selectCheese: { minHeight: 66, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 17, padding: 10, gap: 10, flexDirection: 'row', alignItems: 'center' },
   selectCheeseActive: { borderWidth: 2, borderColor: colors.wine },
