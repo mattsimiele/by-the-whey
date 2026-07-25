@@ -10,6 +10,5 @@ delete from public.likes;
 delete from public.follows;
 delete from public.tasting_photos;
 delete from public.tastings;
-delete from storage.objects where bucket_id = 'tasting-photos';
 
 commit;
