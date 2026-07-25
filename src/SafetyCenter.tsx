@@ -37,11 +37,11 @@ export function SafetyCenter({ visible, userId, onClose }: { visible: boolean; u
   };
 
   const openWebsite = async () => {
-    const url = 'https://thecurdnerd.com';
+    const url = 'https://www.thecurdnerd.com/by-the-whey';
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert('Website unavailable', 'Visit thecurdnerd.com in your browser.');
+      Alert.alert('Website unavailable', 'Visit thecurdnerd.com/by-the-whey in your browser.');
     }
   };
 
@@ -198,7 +198,7 @@ export function SafetyCenter({ visible, userId, onClose }: { visible: boolean; u
             ['Getting help', 'If something is not working, record what you were doing, your device type, and any error message.'],
             ['Safety concerns', 'Use in-app reporting for content or behavior concerns. Urgent real-world emergencies should be directed to local emergency services.'],
             ['Account access', 'Use “Forgot password?” on the sign-in screen. Account deletion is available from the Safety tab on this page.'],
-          ]} /><Pressable style={styles.contact} onPress={openSupportEmail}><Ionicons name="mail-outline" size={19} color={colors.wine} /><Text style={styles.contactText}>support@thecurdnerd.com</Text></Pressable><Pressable style={styles.contact} onPress={openWebsite}><Ionicons name="globe-outline" size={19} color={colors.wine} /><Text style={styles.contactText}>thecurdnerd.com</Text></Pressable></>}
+          ]} /><Pressable style={styles.contact} onPress={openSupportEmail}><Ionicons name="mail-outline" size={19} color={colors.wine} /><Text style={styles.contactText}>support@thecurdnerd.com</Text></Pressable><Pressable style={styles.contact} onPress={openWebsite}><Ionicons name="globe-outline" size={19} color={colors.wine} /><Text style={styles.contactText}>Legal, privacy & account deletion</Text></Pressable></>}
         </ScrollView>
       </SafeAreaView>
     </Modal>

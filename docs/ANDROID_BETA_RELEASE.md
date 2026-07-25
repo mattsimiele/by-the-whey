@@ -58,7 +58,9 @@ Complete:
 - Account-deletion URL
 - Countries/regions
 
-Publish `public-site/by-the-whey` before entering its URLs.
+Use the verified public legal, privacy, support, and account-deletion page:
+
+`https://www.thecurdnerd.com/by-the-whey`
 
 ## 7. Testing tracks
 

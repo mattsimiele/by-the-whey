@@ -69,9 +69,9 @@ Never place a service-role key or database password in the mobile app.
 - [x] Block and unblock users.
 - [x] Admin report-review dashboard.
 - [x] In-app account deletion.
-- [ ] Privacy policy page and public URL.
+- [x] Privacy policy page and public URL.
 - [x] Terms of use.
-- [ ] Support/contact page and public URL.
+- [x] Support/contact page and public URL.
 - [x] Community guidelines.
 - [x] Photo/content moderation process.
 - [x] Server-side text filtering and pre-publication admin review for uploaded photos.
@@ -81,7 +81,7 @@ Never place a service-role key or database password in the mobile app.
 - [x] Add native privacy manifest declarations and clear camera/photo permission descriptions.
 - [ ] Complete App Store Connect privacy disclosures and age-rating questionnaire.
 
-The support contact is `support@thecurdnerd.com`. The Privacy, Terms, Guidelines, and Support pages exist in-app, and deployment-ready HTML is in [`public-site/by-the-whey`](public-site/by-the-whey) for publication on `thecurdnerd.com`. Their final live URLs must be verified before TestFlight/App Review. Sign in with Apple must be verified after the Apple Developer enrollment is active. See [`docs/MODERATION.md`](docs/MODERATION.md) for the operational moderation workflow.
+The support contact is `support@thecurdnerd.com`. Privacy, Terms, Guidelines, Support, and Account Deletion are published together at `https://www.thecurdnerd.com/by-the-whey` and also exist in-app. Sign in with Apple must be verified after the Apple Developer enrollment is active. See [`docs/MODERATION.md`](docs/MODERATION.md) for the operational moderation workflow.
 
 ### Remaining product polish
 

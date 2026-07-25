@@ -41,11 +41,9 @@ Cheese, food journal, tasting notes, food community, pairings
 ## Contact
 
 - Email: support@thecurdnerd.com
-- Website: https://thecurdnerd.com
-- Privacy: https://thecurdnerd.com/by-the-whey/privacy.html
-- Account deletion: https://thecurdnerd.com/by-the-whey/delete-account.html
-
-These URLs must be confirmed after the legal site is published.
+- Website: https://www.thecurdnerd.com
+- Privacy: https://www.thecurdnerd.com/by-the-whey
+- Account deletion: https://www.thecurdnerd.com/by-the-whey
 
 ## Release name
 
