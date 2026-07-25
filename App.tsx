@@ -379,29 +379,34 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, onNotifications
       location_name: locationName.trim() || null,
       visibility: isPublic ? 'public' : 'private',
     }).select('id').single();
-    if (!error && tasting && photo) {
-      const extension = photo.mimeType.includes('png') ? 'png' : photo.mimeType.includes('webp') ? 'webp' : 'jpg';
+    if (error || !tasting) {
+      setSaving(false);
+      Alert.alert('Could not log tasting', error?.message ?? 'The tasting record was not created.');
+      return;
+    }
+    if (photo) {
+      const extension = photo.mimeType.includes('png') ? 'png' : photo.mimeType.includes('webp') ? 'webp' : photo.mimeType.includes('heic') ? 'heic' : 'jpg';
       const storagePath = `${userId}/${tasting.id}/${Date.now()}.${extension}`;
       const { error: uploadError } = await supabase.storage
         .from('tasting-photos')
         .upload(storagePath, decode(photo.base64), { contentType: photo.mimeType, upsert: false });
       if (uploadError) {
+        await supabase.from('tastings').delete().eq('id', tasting.id).eq('user_id', userId);
         setSaving(false);
-        Alert.alert('Tasting saved without photo', uploadError.message);
-        setNote('');
-        setLocationName('');
-        setPhoto(null);
-        onComplete();
+        Alert.alert('Photo could not be attached', `${uploadError.message}\n\nThe tasting was not saved, so you can try again without losing the photo or location you entered.`);
         return;
       }
-      await supabase.from('tasting_photos').insert({ tasting_id: tasting.id, storage_path: storagePath });
+      const { error: photoRecordError } = await supabase.from('tasting_photos').insert({ tasting_id: tasting.id, storage_path: storagePath });
+      if (photoRecordError) {
+        await supabase.storage.from('tasting-photos').remove([storagePath]);
+        await supabase.from('tastings').delete().eq('id', tasting.id).eq('user_id', userId);
+        setSaving(false);
+        Alert.alert('Photo could not be attached', `${photoRecordError.message}\n\nThe tasting was not saved, so you can try again.`);
+        return;
+      }
     }
     setSaving(false);
-    if (error) {
-      Alert.alert('Could not log tasting', error.message);
-      return;
-    }
-    Alert.alert('Tasting logged', `${selected.name} has been added to your cheese diary${isPublic ? ' and shared with your circle' : ''}.`);
+    Alert.alert('Tasting logged', `${selected.name} has been added to your cheese diary${photo ? ' with your photo' : ''}${locationName.trim() ? ` at ${locationName.trim()}` : ''}${isPublic ? ' and shared with your circle' : ''}.`);
     setNote('');
     setLocationName('');
     setPhoto(null);
