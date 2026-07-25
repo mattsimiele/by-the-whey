@@ -52,9 +52,9 @@ export function SectionHeader({ title, action, onPress }: { title: string; actio
   );
 }
 
-export function PrimaryButton({ label, icon, onPress, secondary = false }: { label: string; icon?: keyof typeof Ionicons.glyphMap; onPress?: () => void; secondary?: boolean }) {
+export function PrimaryButton({ label, icon, onPress, secondary = false, disabled = false }: { label: string; icon?: keyof typeof Ionicons.glyphMap; onPress?: () => void; secondary?: boolean; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.buttonSecondary, pressed && { opacity: 0.86 }]}>
+    <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, secondary && styles.buttonSecondary, disabled && { opacity: 0.45 }, pressed && { opacity: 0.86 }]}>
       {icon && <Ionicons name={icon} size={18} color={secondary ? colors.wine : colors.white} />}
       <Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{label}</Text>
     </Pressable>

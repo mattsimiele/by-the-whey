@@ -16,6 +16,7 @@ type Draft = {
   milk_type: string;
   rennet: string;
   cheese_style: string;
+  catalog_category: string;
   age_description: string;
   flavor_profile: string;
   story_notes: string;
@@ -31,6 +32,7 @@ const emptyDraft: Draft = {
   milk_type: '',
   rennet: '',
   cheese_style: '',
+  catalog_category: '',
   age_description: '',
   flavor_profile: '',
   story_notes: '',
@@ -123,6 +125,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     { key: 'milk_type', label: 'Milk type', placeholder: 'Raw cow’s milk' },
     { key: 'rennet', label: 'Rennet', placeholder: 'Animal' },
     { key: 'cheese_style', label: 'Cheese style', placeholder: 'Cheddar' },
+    { key: 'catalog_category', label: 'Catalog category', placeholder: 'Alpine, Blue Cheese, Cheddar, Fresh Cheese, Gouda, Hard Aged Cheese, Soft Cheese, Tomme Style, or Washed Rind' },
     { key: 'age_description', label: 'Age', placeholder: 'Minimum two years' },
     { key: 'flavor_profile', label: 'Flavor profile', placeholder: 'Brothy, caramelized onions, toasted nuts' },
     { key: 'story_notes', label: 'Story / notes', placeholder: 'Producer, herd, process, and distinguishing details', multiline: true },

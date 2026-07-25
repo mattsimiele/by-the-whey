@@ -25,12 +25,12 @@ import { decode } from 'base64-arraybuffer';
 import { AuthScreen } from './src/AuthScreen';
 import { CatalogManagement } from './src/CatalogManagement';
 import { Brand, CheeseArt, PrimaryButton, Rating, SectionHeader } from './src/components';
-import { Cheese, cheeses, posts as seedPosts, Role } from './src/data';
+import { Cheese, Post, Role } from './src/data';
 import { isSupabaseConfigured, supabase } from './src/lib/supabase';
 import { colors, shadow } from './src/theme';
 
 type Tab = 'feed' | 'discover' | 'log' | 'cellar' | 'profile';
-type UserProfile = { id: string; handle: string; display_name: string; role: Role; role_approved: boolean };
+type UserProfile = { id: string; handle: string; display_name: string; bio: string; location: string | null; role: Role; role_approved: boolean };
 
 const tabItems: { id: Tab; label: string; icon: keyof typeof Ionicons.glyphMap; active: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'feed', label: 'Feed', icon: 'home-outline', active: 'home' },
@@ -57,10 +57,11 @@ function AppHeader({ title, subtitle, onNotifications }: { title?: string; subti
   );
 }
 
-function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefresh, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; feedPosts: typeof seedPosts; userId?: string; refreshing: boolean; onRefresh: () => void; onNotifications: () => void }) {
+function FeedScreen({ openCheese, catalog, feedPosts, profile, userId, refreshing, onRefresh, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; feedPosts: Post[]; profile: UserProfile | null; userId?: string; refreshing: boolean; onRefresh: () => void; onNotifications: () => void }) {
   const [liked, setLiked] = useState<string[]>([]);
   const [following, setFollowing] = useState<string[]>([]);
-  const [commentPost, setCommentPost] = useState<(typeof seedPosts)[number] | null>(null);
+  const [commentPost, setCommentPost] = useState<Post | null>(null);
+  const initials = (profile?.display_name ?? 'Guest').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 
   return (
     <ScrollView
@@ -71,10 +72,10 @@ function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefr
       <AppHeader onNotifications={onNotifications} />
       <View style={styles.welcomeRow}>
         <View>
-          <Text style={styles.eyebrow}>SATURDAY, JULY 25</Text>
-          <Text style={styles.heroTitle}>Good evening, Matt.</Text>
+          <Text style={styles.eyebrow}>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()}</Text>
+          <Text style={styles.heroTitle}>Welcome, {profile?.display_name ?? 'cheese lover'}.</Text>
         </View>
-        <View style={styles.avatar}><Text style={styles.avatarText}>MS</Text></View>
+        <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
       </View>
 
       <View style={styles.promptCard}>
@@ -86,17 +87,18 @@ function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefr
           </View>
           <Ionicons name="arrow-forward" size={20} color={colors.wine} />
         </View>
-        <View style={styles.promptDivider} />
-        <View style={styles.promptStats}>
-          <Text style={styles.promptStat}><Text style={styles.promptStatStrong}>28</Text> cheeses tasted</Text>
-          <View style={styles.miniDot} />
-          <Text style={styles.promptStat}><Text style={styles.promptStatStrong}>7</Text> styles explored</Text>
-        </View>
       </View>
 
       <SectionHeader title="From your circle" action="See all" />
-      {feedPosts.map((post) => {
-        const cheese = catalog.find((item) => item.id === post.cheeseId) ?? cheeses.find((item) => item.id === post.cheeseId)!;
+      {!feedPosts.length && (
+        <View style={styles.emptyState}>
+          <Ionicons name="people-outline" size={36} color={colors.sage} />
+          <Text style={styles.emptyStateTitle}>Your feed is ready</Text>
+          <Text style={styles.emptyStateCopy}>New public tastings from real testers will appear here.</Text>
+        </View>
+      )}
+      {feedPosts.filter((post) => catalog.some((item) => item.id === post.cheeseId)).map((post) => {
+        const cheese = catalog.find((item) => item.id === post.cheeseId)!;
         const isLiked = liked.includes(post.id);
         return (
           <View key={post.id} style={styles.postCard}>
@@ -186,7 +188,7 @@ function FeedScreen({ openCheese, catalog, feedPosts, userId, refreshing, onRefr
   );
 }
 
-function CommentsModal({ post, userId, onClose }: { post: (typeof seedPosts)[number] | null; userId?: string; onClose: () => void }) {
+function CommentsModal({ post, userId, onClose }: { post: Post | null; userId?: string; onClose: () => void }) {
   const [comments, setComments] = useState<{ id: string; body: string; created_at: string; profiles: { display_name: string; handle: string } }[]>([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -244,10 +246,10 @@ function CommentsModal({ post, userId, onClose }: { post: (typeof seedPosts)[num
 function DiscoverScreen({ openCheese, catalog, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; onNotifications: () => void }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
-  const filters = ['All', 'Cow', 'Goat', 'Blue', 'Washed rind'];
+  const filters = ['All', 'Alpine', 'Blue Cheese', 'Cheddar', 'Fresh Cheese', 'Gouda', 'Hard Aged Cheese', 'Soft Cheese', 'Tomme Style', 'Washed Rind'];
   const results = useMemo(() => catalog.filter((cheese) => {
-    const matchesQuery = `${cheese.name} ${cheese.creamery} ${cheese.location} ${cheese.style} ${cheese.flavorProfile.join(' ')}`.toLowerCase().includes(query.toLowerCase());
-    const matchesFilter = filter === 'All' || cheese.milkType.includes(filter) || cheese.style === filter;
+    const matchesQuery = `${cheese.name} ${cheese.creamery} ${cheese.location} ${cheese.style} ${cheese.category} ${cheese.flavorProfile.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase());
+    const matchesFilter = filter === 'All' || cheese.category === filter;
     return matchesQuery && matchesFilter;
   }), [query, filter, catalog]);
 
@@ -257,7 +259,7 @@ function DiscoverScreen({ openCheese, catalog, onNotifications }: { openCheese: 
       <View style={styles.searchBox}>
         <Ionicons name="search" size={20} color={colors.muted} />
         <TextInput value={query} onChangeText={setQuery} placeholder="Cheese, maker, region…" placeholderTextColor="#9B958A" style={styles.searchInput} />
-        <Ionicons name="scan-outline" size={21} color={colors.wine} />
+        {query ? <Pressable onPress={() => setQuery('')}><Ionicons name="close-circle" size={21} color={colors.muted} /></Pressable> : null}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {filters.map((item) => (
@@ -267,22 +269,7 @@ function DiscoverScreen({ openCheese, catalog, onNotifications }: { openCheese: 
         ))}
       </ScrollView>
 
-      {!query && filter === 'All' && (
-        <>
-          <Text style={styles.discoveryLabel}>FEATURED THIS WEEK</Text>
-          <Pressable style={styles.featuredCard} onPress={() => openCheese(catalog.find((cheese) => cheese.id === 'rogue-river') ?? catalog[0]!)}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.featuredKicker}>A RARE SEASONAL BLUE</Text>
-              <Text style={styles.featuredTitle}>Rogue River{'\n'}Blue</Text>
-              <Text style={styles.featuredCopy}>Pear brandy, fig, and hazelnut wrapped in Syrah leaves.</Text>
-              <Text style={styles.featuredLink}>Meet the cheese  →</Text>
-            </View>
-            <CheeseArt name="Rogue River Blue" color="#7C8794" size={118} />
-          </Pressable>
-        </>
-      )}
-
-      <SectionHeader title={query ? `${results.length} results` : 'Popular near you'} action="View map" />
+      <SectionHeader title={`${results.length} ${filter === 'All' ? 'cheeses' : filter}`} />
       <View style={styles.cheeseList}>
         {results.map((cheese) => (
           <Pressable key={cheese.id} style={styles.cheeseRow} onPress={() => openCheese(cheese)}>
@@ -301,17 +288,24 @@ function DiscoverScreen({ openCheese, catalog, onNotifications }: { openCheese: 
           </Pressable>
         ))}
       </View>
+      {!results.length && <View style={styles.emptyState}><Ionicons name="search-outline" size={36} color={colors.sage} /><Text style={styles.emptyStateTitle}>No cheeses found</Text><Text style={styles.emptyStateCopy}>Try another name, maker, region, or category.</Text></View>}
     </ScrollView>
   );
 }
 
 function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplete: () => void; catalog: Cheese[]; userId?: string; onNotifications: () => void }) {
-  const [selected, setSelected] = useState<Cheese>(catalog[0] ?? cheeses[0]!);
+  const [selected, setSelected] = useState<Cheese | null>(null);
+  const [cheeseQuery, setCheeseQuery] = useState('');
   const [rating, setRating] = useState(4.5);
   const [note, setNote] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [photo, setPhoto] = useState<{ uri: string; base64: string; mimeType: string } | null>(null);
+  const cheeseResults = useMemo(() => {
+    const normalized = cheeseQuery.trim().toLowerCase();
+    if (!normalized) return catalog.slice(0, 12);
+    return catalog.filter((cheese) => `${cheese.name} ${cheese.creamery} ${cheese.location} ${cheese.category}`.toLowerCase().includes(normalized)).slice(0, 30);
+  }, [catalog, cheeseQuery]);
 
   const pickPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -333,8 +327,8 @@ function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplet
   };
 
   const submit = async () => {
-    if (!supabase || !userId) {
-      Alert.alert('Account required', 'Create or sign in to an account before logging a tasting.');
+    if (!supabase || !userId || !selected) {
+      Alert.alert('Select a cheese', 'Choose a catalog cheese before logging your tasting.');
       return;
     }
     setSaving(true);
@@ -388,15 +382,22 @@ function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplet
       <ScrollView contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled">
         <AppHeader title="Log a tasting" subtitle="CAPTURE THE MOMENT" onNotifications={onNotifications} />
         <Text style={styles.fieldLabel}>WHAT ARE YOU TASTING?</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 8 }}>
-          {catalog.map((cheese) => (
-            <Pressable key={cheese.id} onPress={() => setSelected(cheese)} style={[styles.selectCheese, selected.id === cheese.id && styles.selectCheeseActive]}>
-              <CheeseArt name={cheese.name} color={cheese.color} size={52} />
-              <Text numberOfLines={1} style={styles.selectCheeseName}>{cheese.name}</Text>
-              {selected.id === cheese.id && <View style={styles.selectedCheck}><Ionicons name="checkmark" size={12} color={colors.white} /></View>}
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={20} color={colors.muted} />
+          <TextInput value={cheeseQuery} onChangeText={setCheeseQuery} placeholder="Search cheese, maker, or category…" placeholderTextColor="#9B958A" style={styles.searchInput} />
+          {cheeseQuery ? <Pressable onPress={() => setCheeseQuery('')}><Ionicons name="close-circle" size={21} color={colors.muted} /></Pressable> : null}
+        </View>
+        <Text style={styles.searchHint}>{cheeseQuery ? `${cheeseResults.length} matching cheeses` : 'Start typing or choose from the first 12 cheeses'}</Text>
+        <View style={styles.cheesePickerResults}>
+          {cheeseResults.map((cheese) => (
+            <Pressable key={cheese.id} onPress={() => setSelected(cheese)} style={[styles.selectCheese, selected?.id === cheese.id && styles.selectCheeseActive]}>
+              <CheeseArt name={cheese.name} color={cheese.color} size={44} />
+              <View style={{ flex: 1 }}><Text style={styles.selectCheeseName}>{cheese.name}</Text><Text style={styles.selectCheeseMaker}>{cheese.creamery} · {cheese.category}</Text></View>
+              {selected?.id === cheese.id && <View style={styles.selectedCheck}><Ionicons name="checkmark" size={12} color={colors.white} /></View>}
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
+        {!cheeseResults.length && <Text style={styles.noSearchResults}>No matching cheeses. A cheesemonger can submit a missing catalog entry.</Text>}
 
         <View style={styles.ratingPanel}>
           <Text style={styles.fieldLabel}>YOUR RATING</Text>
@@ -421,7 +422,7 @@ function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplet
           style={styles.noteInput}
         />
         <View style={styles.quickNotes}>
-          {selected.flavorProfile.map((item) => <Pressable key={item} onPress={() => setNote((current) => `${current}${current ? ', ' : ''}${item.toLowerCase()}`)} style={styles.noteChip}><Text style={styles.noteChipText}>+ {item}</Text></Pressable>)}
+          {(selected?.flavorProfile ?? []).map((item) => <Pressable key={item} onPress={() => setNote((current) => `${current}${current ? ', ' : ''}${item.toLowerCase()}`)} style={styles.noteChip}><Text style={styles.noteChipText}>+ {item}</Text></Pressable>)}
         </View>
 
         <View style={styles.addOns}>
@@ -437,24 +438,54 @@ function LogScreen({ onComplete, catalog, userId, onNotifications }: { onComplet
             <View style={[styles.switch, isPublic && styles.switchActive]}><View style={[styles.switchKnob, isPublic && styles.switchKnobActive]} /></View>
           </Pressable>
         </View>
-        {saving ? <ActivityIndicator color={colors.wine} /> : <PrimaryButton label="Log this tasting" icon="checkmark-circle-outline" onPress={submit} />}
+        {saving ? <ActivityIndicator color={colors.wine} /> : <PrimaryButton label={selected ? `Log ${selected.name}` : 'Select a cheese first'} icon="checkmark-circle-outline" onPress={submit} disabled={!selected} />}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-function CellarScreen({ openCheese, catalog, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; onNotifications: () => void }) {
+type CellarEntry = { cheese: Cheese; count: number; average: number; lastTasted: string };
+
+function CellarScreen({ openCheese, catalog, userId, reload, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; userId?: string; reload: number; onNotifications: () => void }) {
   const [segment, setSegment] = useState<'Tasted' | 'Want to try'>('Tasted');
-  const list = segment === 'Tasted' ? catalog.slice(0, 4) : catalog.slice(3);
+  const [entries, setEntries] = useState<CellarEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!supabase || !userId || !catalog.length) {
+      setEntries([]);
+      return;
+    }
+    setLoading(true);
+    supabase.from('tastings').select('rating,created_at,cheeses:cheese_id(slug)').eq('user_id', userId).order('created_at', { ascending: false })
+      .then(({ data }) => {
+        const grouped = new Map<string, { ratings: number[]; lastTasted: string }>();
+        for (const row of data ?? []) {
+          const joined = row.cheeses as unknown as { slug: string } | null;
+          if (!joined?.slug) continue;
+          const current = grouped.get(joined.slug);
+          if (current) current.ratings.push(Number(row.rating));
+          else grouped.set(joined.slug, { ratings: [Number(row.rating)], lastTasted: row.created_at });
+        }
+        setEntries(Array.from(grouped.entries()).flatMap(([slug, value]) => {
+          const cheese = catalog.find((item) => item.id === slug);
+          return cheese ? [{ cheese, count: value.ratings.length, average: value.ratings.reduce((sum, rating) => sum + rating, 0) / value.ratings.length, lastTasted: value.lastTasted }] : [];
+        }));
+        setLoading(false);
+      });
+  }, [userId, catalog, reload]);
+
+  const stylesExplored = new Set(entries.map((entry) => entry.cheese.category)).size;
+  const regionsExplored = new Set(entries.map((entry) => entry.cheese.location)).size;
   return (
     <ScrollView contentContainerStyle={styles.screenContent}>
       <AppHeader title="My cellar" subtitle="YOUR CHEESE JOURNEY" onNotifications={onNotifications} />
       <View style={styles.cellarSummary}>
-        <View><Text style={styles.summaryNumber}>28</Text><Text style={styles.summaryLabel}>TASTED</Text></View>
+        <View><Text style={styles.summaryNumber}>{entries.length}</Text><Text style={styles.summaryLabel}>CHEESES</Text></View>
         <View style={styles.summaryDivider} />
-        <View><Text style={styles.summaryNumber}>7</Text><Text style={styles.summaryLabel}>STYLES</Text></View>
+        <View><Text style={styles.summaryNumber}>{stylesExplored}</Text><Text style={styles.summaryLabel}>STYLES</Text></View>
         <View style={styles.summaryDivider} />
-        <View><Text style={styles.summaryNumber}>6</Text><Text style={styles.summaryLabel}>REGIONS</Text></View>
+        <View><Text style={styles.summaryNumber}>{regionsExplored}</Text><Text style={styles.summaryLabel}>REGIONS</Text></View>
       </View>
       <View style={styles.segment}>
         {(['Tasted', 'Want to try'] as const).map((item) => (
@@ -464,17 +495,25 @@ function CellarScreen({ openCheese, catalog, onNotifications }: { openCheese: (c
         ))}
       </View>
       <View style={styles.cheeseList}>
-        {list.map((cheese, index) => (
-          <Pressable key={cheese.id} style={styles.cheeseRow} onPress={() => openCheese(cheese)}>
-            <CheeseArt name={cheese.name} color={cheese.color} size={70} />
+        {segment === 'Tasted' && entries.map((entry) => (
+          <Pressable key={entry.cheese.id} style={styles.cheeseRow} onPress={() => openCheese(entry.cheese)}>
+            <CheeseArt name={entry.cheese.name} color={entry.cheese.color} size={70} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.cheeseName}>{cheese.name}</Text>
-              <Text style={styles.cheeseMaker}>{cheese.creamery}</Text>
-              <Text style={styles.cheeseMeta}>{segment === 'Tasted' ? `Tasted ${index + 2} times · Last July ${18 - index}` : cheese.location}</Text>
+              <Text style={styles.cheeseName}>{entry.cheese.name}</Text>
+              <Text style={styles.cheeseMaker}>{entry.cheese.creamery}</Text>
+              <Text style={styles.cheeseMeta}>Tasted {entry.count} {entry.count === 1 ? 'time' : 'times'} · Last {new Date(entry.lastTasted).toLocaleDateString()}</Text>
             </View>
-            {segment === 'Tasted' ? <Rating value={Math.max(4.1, cheese.rating - 0.1)} /> : <Ionicons name="bookmark" size={20} color={colors.wine} />}
+            <Rating value={entry.average} />
           </Pressable>
         ))}
+        {!loading && ((segment === 'Tasted' && !entries.length) || segment === 'Want to try') && (
+          <View style={styles.emptyState}>
+            <Ionicons name={segment === 'Tasted' ? 'restaurant-outline' : 'bookmark-outline'} size={36} color={colors.sage} />
+            <Text style={styles.emptyStateTitle}>{segment === 'Tasted' ? 'Your cellar is empty' : 'No saved cheeses yet'}</Text>
+            <Text style={styles.emptyStateCopy}>{segment === 'Tasted' ? 'Your first logged tasting will appear here with your personal stats.' : 'Saved-cheese syncing is coming next.'}</Text>
+          </View>
+        )}
+        {loading && <ActivityIndicator color={colors.wine} />}
       </View>
     </ScrollView>
   );
@@ -484,30 +523,45 @@ function ProfileScreen({ profile, signedIn, onManageCatalog, onNotifications }: 
   const role = profile?.role ?? 'turophile';
   const displayName = profile?.display_name ?? 'Guest Turophile';
   const initials = displayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'BT';
+  const [stats, setStats] = useState({ following: 0, followers: 0, tastings: 0 });
+
+  useEffect(() => {
+    if (!supabase || !profile?.id) {
+      setStats({ following: 0, followers: 0, tastings: 0 });
+      return;
+    }
+    Promise.all([
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profile.id),
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profile.id),
+      supabase.from('tastings').select('*', { count: 'exact', head: true }).eq('user_id', profile.id),
+    ]).then(([following, followers, tastings]) => setStats({
+      following: following.count ?? 0,
+      followers: followers.count ?? 0,
+      tastings: tastings.count ?? 0,
+    }));
+  }, [profile?.id]);
+
   return (
     <ScrollView contentContainerStyle={styles.screenContent}>
       <AppHeader onNotifications={onNotifications} />
       <View style={styles.profileHero}>
         <View style={styles.profileAvatar}><Text style={styles.profileInitials}>{initials}</Text></View>
         <Text style={styles.profileName}>{displayName}</Text>
-        <Text style={styles.profileHandle}>{profile ? `@${profile.handle}` : 'Guest preview'} · Philadelphia, PA</Text>
+        <Text style={styles.profileHandle}>{profile ? `@${profile.handle}${profile.location ? ` · ${profile.location}` : ''}` : 'Guest preview'}</Text>
         <View style={styles.roleBadge}><Ionicons name={role === 'admin' ? 'shield-checkmark' : role === 'cheesemonger' ? 'storefront' : 'sparkles'} size={14} color={colors.wine} /><Text style={styles.roleText}>{role === 'admin' ? 'Administrator' : role === 'cheesemonger' ? 'Verified Cheesemonger' : 'Turophile'}</Text></View>
-        <Text style={styles.bio}>Always looking for the next perfect wedge. Creator of By the Whey.</Text>
+        <Text style={styles.bio}>{profile?.bio || 'Your cheese journey starts with your first tasting.'}</Text>
         <View style={styles.followStats}>
-          <Text style={styles.followStat}><Text style={styles.followStrong}>142</Text>{'\n'}following</Text>
-          <Text style={styles.followStat}><Text style={styles.followStrong}>318</Text>{'\n'}followers</Text>
-          <Text style={styles.followStat}><Text style={styles.followStrong}>28</Text>{'\n'}tastings</Text>
+          <Text style={styles.followStat}><Text style={styles.followStrong}>{stats.following}</Text>{'\n'}following</Text>
+          <Text style={styles.followStat}><Text style={styles.followStrong}>{stats.followers}</Text>{'\n'}followers</Text>
+          <Text style={styles.followStat}><Text style={styles.followStrong}>{stats.tastings}</Text>{'\n'}tastings</Text>
         </View>
       </View>
 
       <SectionHeader title="Your palate" />
       <View style={styles.palateCard}>
-        <View style={styles.palateRow}><Text style={styles.palateLabel}>Bold & funky</Text><Text style={styles.palateValue}>82%</Text></View>
-        <View style={styles.progressTrack}><View style={[styles.progressFill, { width: '82%' }]} /></View>
-        <View style={styles.palateRow}><Text style={styles.palateLabel}>Creamy & soft</Text><Text style={styles.palateValue}>71%</Text></View>
-        <View style={styles.progressTrack}><View style={[styles.progressFill, { width: '71%', backgroundColor: colors.gold }]} /></View>
-        <View style={styles.palateRow}><Text style={styles.palateLabel}>Nutty & aged</Text><Text style={styles.palateValue}>64%</Text></View>
-        <View style={styles.progressTrack}><View style={[styles.progressFill, { width: '64%', backgroundColor: colors.sage }]} /></View>
+        <Ionicons name="analytics-outline" size={28} color={colors.sage} />
+        <Text style={styles.emptyStateTitle}>{stats.tastings ? 'Palate insights are building' : 'Log tastings to reveal your palate'}</Text>
+        <Text style={styles.emptyStateCopy}>Your preferences will be calculated from your own ratings—not prototype percentages.</Text>
       </View>
 
       <SectionHeader title="Account access" />
@@ -652,8 +706,8 @@ function PasswordResetModal({ visible, onClose }: { visible: boolean; onClose: (
 function Root({ profile, signedIn, userId }: { profile: UserProfile | null; signedIn: boolean; userId?: string }) {
   const [tab, setTab] = useState<Tab>('feed');
   const [selectedCheese, setSelectedCheese] = useState<Cheese | null>(null);
-  const [catalog, setCatalog] = useState<Cheese[]>(cheeses);
-  const [feedPosts, setFeedPosts] = useState(seedPosts);
+  const [catalog, setCatalog] = useState<Cheese[]>([]);
+  const [feedPosts, setFeedPosts] = useState<Post[]>([]);
   const [feedReload, setFeedReload] = useState(0);
   const [refreshingFeed, setRefreshingFeed] = useState(false);
   const [catalogManagementOpen, setCatalogManagementOpen] = useState(false);
@@ -673,6 +727,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
         milkType: row.milk_type,
         rennet: row.rennet,
         style: row.cheese_style,
+        category: row.catalog_category ?? 'Uncategorized',
         age: row.age_description,
         flavorProfile: row.flavor_profile,
         story: row.story_notes,
@@ -681,8 +736,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
         logs: 0,
         color: colors.gold,
       } satisfies Cheese));
-      const liveSlugs = new Set(live.map((item) => item.id));
-      setCatalog([...live, ...cheeses.filter((item) => !liveSlugs.has(item.id))]);
+      setCatalog(live);
     });
   }, [catalogReload]);
 
@@ -699,7 +753,7 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
         setRefreshingFeed(false);
         if (error) return;
         if (!data?.length) {
-          setFeedPosts(seedPosts);
+          setFeedPosts([]);
           return;
         }
         Promise.all(data.map(async (row) => {
@@ -725,14 +779,14 @@ function Root({ profile, signedIn, userId }: { profile: UserProfile | null; sign
             comments: 0,
             photoUrl: signed?.data?.signedUrl,
           };
-        })).then((livePosts) => setFeedPosts([...livePosts, ...seedPosts]));
+        })).then(setFeedPosts);
       });
   }, [tab, feedReload]);
 
-  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} userId={userId} refreshing={refreshingFeed} onRefresh={() => setFeedReload((value) => value + 1)} onNotifications={openNotifications} />
+  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} catalog={catalog} feedPosts={feedPosts} profile={profile} userId={userId} refreshing={refreshingFeed} onRefresh={() => setFeedReload((value) => value + 1)} onNotifications={openNotifications} />
     : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} onNotifications={openNotifications} />
     : tab === 'log' ? <LogScreen onComplete={() => { setFeedReload((value) => value + 1); setTab('feed'); }} catalog={catalog} userId={userId} onNotifications={openNotifications} />
-    : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} onNotifications={openNotifications} />
+    : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} userId={userId} reload={feedReload} onNotifications={openNotifications} />
     : <ProfileScreen profile={profile} signedIn={signedIn} onManageCatalog={() => setCatalogManagementOpen(true)} onNotifications={openNotifications} />;
 
   return (
@@ -806,7 +860,7 @@ export default function App() {
       setProfile(null);
       return;
     }
-    supabase.from('profiles').select('id,handle,display_name,role,role_approved').eq('id', session.user.id).single()
+    supabase.from('profiles').select('id,handle,display_name,bio,location,role,role_approved').eq('id', session.user.id).single()
       .then(({ data }) => setProfile(data as UserProfile | null));
   }, [session]);
 
@@ -906,6 +960,9 @@ const styles = StyleSheet.create({
   emptyNotificationTitle: { color: colors.ink, fontSize: 18, fontWeight: '800', marginTop: 12 },
   searchBox: { height: 52, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, marginTop: 9, ...shadow },
   searchInput: { flex: 1, paddingHorizontal: 10, color: colors.ink, fontSize: 14 },
+  searchHint: { color: colors.muted, fontSize: 10, marginTop: 8, marginBottom: 10 },
+  cheesePickerResults: { gap: 8, maxHeight: 310 },
+  noSearchResults: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', paddingVertical: 18 },
   filterRow: { gap: 8, paddingVertical: 16 },
   filterPill: { paddingHorizontal: 15, height: 35, borderRadius: 18, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
   filterPillActive: { backgroundColor: colors.wine, borderColor: colors.wine },
@@ -924,9 +981,10 @@ const styles = StyleSheet.create({
   cheeseMetaRow: { flexDirection: 'row', marginTop: 7 },
   cheeseMeta: { color: colors.muted, fontSize: 10 },
   fieldLabel: { color: colors.muted, fontWeight: '900', fontSize: 9, letterSpacing: 1.5, marginTop: 18, marginBottom: 10 },
-  selectCheese: { width: 104, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 17, padding: 10, gap: 8 },
+  selectCheese: { minHeight: 66, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 17, padding: 10, gap: 10, flexDirection: 'row', alignItems: 'center' },
   selectCheeseActive: { borderWidth: 2, borderColor: colors.wine },
   selectCheeseName: { fontSize: 11, fontWeight: '800', color: colors.ink },
+  selectCheeseMaker: { fontSize: 9, color: colors.muted, marginTop: 3 },
   selectedCheck: { position: 'absolute', top: 7, right: 7, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.wine, alignItems: 'center', justifyContent: 'center' },
   ratingPanel: { alignItems: 'center', backgroundColor: colors.cream, borderRadius: 22, marginTop: 18, paddingVertical: 22, paddingHorizontal: 25 },
   ratingNumber: { color: colors.ink, fontSize: 46, fontWeight: '800', letterSpacing: -2 },
@@ -947,6 +1005,9 @@ const styles = StyleSheet.create({
   switchKnob: { width: 17, height: 17, backgroundColor: colors.white, borderRadius: 9 },
   switchKnobActive: { marginLeft: 17 },
   cellarSummary: { marginTop: 10, padding: 20, borderRadius: 20, backgroundColor: colors.wine, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 35, paddingHorizontal: 24 },
+  emptyStateTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', textAlign: 'center', marginTop: 9 },
+  emptyStateCopy: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 5 },
   summaryNumber: { color: colors.white, textAlign: 'center', fontSize: 25, fontWeight: '800' },
   summaryLabel: { color: '#E6C9D1', marginTop: 3, fontSize: 8, letterSpacing: 1.2, fontWeight: '800' },
   summaryDivider: { width: 1, height: 31, backgroundColor: 'rgba(255,255,255,0.25)' },
@@ -966,7 +1027,7 @@ const styles = StyleSheet.create({
   followStats: { flexDirection: 'row', gap: 35, marginTop: 20 },
   followStat: { color: colors.muted, textAlign: 'center', fontSize: 10, lineHeight: 17 },
   followStrong: { color: colors.ink, fontWeight: '900', fontSize: 17 },
-  palateCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 25 },
+  palateCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 24, marginBottom: 25, alignItems: 'center' },
   palateRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7, marginTop: 5 },
   palateLabel: { color: colors.ink, fontWeight: '700', fontSize: 12 },
   palateValue: { color: colors.muted, fontWeight: '800', fontSize: 11 },
