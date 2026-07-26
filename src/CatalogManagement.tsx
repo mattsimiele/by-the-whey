@@ -366,7 +366,12 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
           <View style={{ width: 38 }} />
         </View>
         {role === 'admin' && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabsScroller}
+            contentContainerStyle={styles.tabs}
+          >
             {(['review', 'catalog', 'photos', 'reports', 'submit', 'users'] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item === 'review' ? `Review ${submissions.length}` : item === 'catalog' ? 'Edit catalog' : item === 'photos' ? `Photos ${photos.length}` : item === 'reports' ? `Reports ${reports.length}` : item === 'submit' ? 'Add' : 'Users'}</Text></Pressable>)}
           </ScrollView>
         )}
@@ -503,8 +508,9 @@ const styles = StyleSheet.create({
   close: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   kicker: { color: colors.wine, textAlign: 'center', fontSize: 8, fontWeight: '900', letterSpacing: 1.5 },
   title: { color: colors.ink, fontSize: 17, fontWeight: '800', marginTop: 2 },
-  tabs: { marginHorizontal: 16, marginVertical: 12, padding: 4, minHeight: 44, backgroundColor: colors.cream, borderRadius: 14, gap: 4 },
-  tab: { minWidth: 82, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
+  tabsScroller: { flexGrow: 0, flexShrink: 0, height: 52, marginHorizontal: 16, marginVertical: 12, backgroundColor: colors.cream, borderRadius: 14 },
+  tabs: { padding: 4, gap: 4, alignItems: 'center' },
+  tab: { minWidth: 82, height: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
   tabActive: { backgroundColor: colors.white },
   tabText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   tabTextActive: { color: colors.wine },
