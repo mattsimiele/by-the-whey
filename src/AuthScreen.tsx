@@ -76,6 +76,7 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
           email: email.trim().toLowerCase(),
           password,
           options: {
+            emailRedirectTo: 'https://www.thecurdnerd.com/by-the-whey?auth=confirmed',
             data: {
               display_name: displayName.trim(),
               handle: handle.trim().toLowerCase(),

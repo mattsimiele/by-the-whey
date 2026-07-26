@@ -71,7 +71,7 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#F6F0E3"
       },
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro"

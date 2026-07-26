@@ -7,7 +7,7 @@ By the Whey is a cross-platform social cheese journal for discovering cheeses, l
 ## What is included
 
 - Polished iOS/Android interface built with React Native and Expo
-- Community feed with interactive likes
+- Public/following community feeds with likes, comments, actionable notifications, and people search
 - Searchable and filterable cheese catalog
 - Cheese detail pages
 - Guided tasting logger with rating, notes, visibility, photo, and location affordances
@@ -58,6 +58,7 @@ See [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) for the proposed schema and polic
 2. Run `supabase/migrations/202607250001_initial_schema.sql` in its SQL Editor.
 3. Copy `.env.example` to `.env`.
 4. Add the project URL and publishable key from Supabase Project Settings → API.
+5. In Authentication → URL Configuration, set the Site URL to `https://www.thecurdnerd.com/by-the-whey` and add `https://www.thecurdnerd.com/by-the-whey**` plus `bythewhey://**` to the redirect allow list. This keeps confirmation emails off localhost while preserving in-app password recovery.
 
 Never place a service-role key or database password in the mobile app.
 

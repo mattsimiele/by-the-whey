@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -68,11 +68,18 @@ function RetryState({ message, onRetry }: { message: string; onRetry: () => void
   return <View style={styles.retryState}><Ionicons name="cloud-offline-outline" size={32} color={colors.sage} /><Text style={styles.retryText}>{message}</Text><Pressable onPress={onRetry} style={styles.retryButton}><Text style={styles.retryButtonText}>Try again</Text></Pressable></View>;
 }
 
-function FeedScreen({ openCheese, openProfile, catalog, feedPosts, profile, userId, refreshing, error, unreadCount, onRefresh, onLog, onNotifications }: { openCheese: (cheese: Cheese) => void; openProfile: (id: string) => void; catalog: Cheese[]; feedPosts: Post[]; profile: UserProfile | null; userId?: string; refreshing: boolean; error: string | null; unreadCount: number; onRefresh: () => void; onLog: () => void; onNotifications: () => void }) {
+function FeedScreen({ openCheese, openProfile, catalog, feedPosts, profile, userId, refreshing, error, unreadCount, focusPostId, onFocusHandled, onRefresh, onLog, onNotifications }: { openCheese: (cheese: Cheese) => void; openProfile: (id: string) => void; catalog: Cheese[]; feedPosts: Post[]; profile: UserProfile | null; userId?: string; refreshing: boolean; error: string | null; unreadCount: number; focusPostId?: string | null; onFocusHandled: () => void; onRefresh: () => void; onLog: () => void; onNotifications: () => void }) {
   const [liked, setLiked] = useState<string[]>([]);
   const [following, setFollowing] = useState<string[]>([]);
   const [commentPost, setCommentPost] = useState<Post | null>(null);
+  const [feedScope, setFeedScope] = useState<'public' | 'following'>('public');
+  const [peopleQuery, setPeopleQuery] = useState('');
+  const [people, setPeople] = useState<{ id: string; display_name: string; handle: string; avatar_path: string | null }[]>([]);
+  const [searchingPeople, setSearchingPeople] = useState(false);
   const initials = (profile?.display_name ?? 'Guest').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+  const visiblePosts = feedScope === 'following'
+    ? feedPosts.filter((post) => post.userId === userId || (post.userId && following.includes(post.userId)))
+    : feedPosts;
 
   useEffect(() => {
     if (!supabase || !userId) {
@@ -88,6 +95,50 @@ function FeedScreen({ openCheese, openProfile, catalog, feedPosts, profile, user
       setFollowing((followsResult.data ?? []).map((row) => row.following_id));
     });
   }, [userId, feedPosts]);
+
+  useEffect(() => {
+    if (!focusPostId) return;
+    const post = feedPosts.find((item) => item.id === focusPostId);
+    if (post) {
+      setCommentPost(post);
+      onFocusHandled();
+    }
+  }, [focusPostId, feedPosts, onFocusHandled]);
+
+  useEffect(() => {
+    const normalized = peopleQuery.trim().replace(/[^a-zA-Z0-9_ ]/g, '');
+    if (!supabase || normalized.length < 2) {
+      setPeople([]);
+      setSearchingPeople(false);
+      return;
+    }
+    setSearchingPeople(true);
+    const timer = setTimeout(() => {
+      supabase!
+        .from('profiles')
+        .select('id,display_name,handle,avatar_path')
+        .neq('id', userId ?? '00000000-0000-0000-0000-000000000000')
+        .or(`display_name.ilike.%${normalized}%,handle.ilike.%${normalized}%`)
+        .order('display_name')
+        .limit(12)
+        .then(({ data }) => {
+          setPeople(data ?? []);
+          setSearchingPeople(false);
+        });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [peopleQuery, userId]);
+
+  const toggleFollow = async (profileId: string) => {
+    if (!supabase || !userId) return Alert.alert('Sign in required', 'Sign in to follow people.');
+    const isFollowing = following.includes(profileId);
+    const action = isFollowing
+      ? supabase.from('follows').delete().eq('follower_id', userId).eq('following_id', profileId)
+      : supabase.from('follows').upsert({ follower_id: userId, following_id: profileId });
+    const { error: followError } = await action;
+    if (followError) return Alert.alert('Could not update follow', followError.message);
+    setFollowing((current) => isFollowing ? current.filter((id) => id !== profileId) : [...current, profileId]);
+  };
 
   const deleteTasting = (post: Post) => {
     if (!supabase || !userId || post.userId !== userId) return;
@@ -190,16 +241,45 @@ function FeedScreen({ openCheese, openProfile, catalog, feedPosts, profile, user
         </View>
       </Pressable>
 
-      <SectionHeader title="From your circle" />
+      <View style={styles.feedTools}>
+        <View style={styles.feedScopePicker}>
+          {(['public', 'following'] as const).map((scope) => (
+            <Pressable key={scope} onPress={() => setFeedScope(scope)} style={[styles.feedScopeButton, feedScope === scope && styles.feedScopeButtonActive]}>
+              <Text style={[styles.feedScopeText, feedScope === scope && styles.feedScopeTextActive]}>{scope === 'public' ? 'Public' : 'Following'}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.peopleSearch}>
+          <Ionicons name="people-outline" size={19} color={colors.muted} />
+          <TextInput value={peopleQuery} onChangeText={setPeopleQuery} placeholder="Find people by name or @handle" placeholderTextColor="#9B958A" style={styles.searchInput} autoCapitalize="none" />
+          {searchingPeople ? <ActivityIndicator size="small" color={colors.wine} /> : peopleQuery ? <Pressable onPress={() => setPeopleQuery('')}><Ionicons name="close-circle" size={20} color={colors.muted} /></Pressable> : null}
+        </View>
+        {peopleQuery.trim().length >= 2 && (
+          <View style={styles.peopleResults}>
+            {people.map((person) => (
+              <View key={person.id} style={styles.personResult}>
+                <Pressable onPress={() => openProfile(person.id)} style={styles.personIdentity}>
+                  {person.avatar_path ? <Image source={{ uri: supabase!.storage.from('profile-avatars').getPublicUrl(person.avatar_path).data.publicUrl }} style={styles.personAvatar} /> : <View style={styles.personAvatarFallback}><Text style={styles.personAvatarText}>{person.display_name.charAt(0).toUpperCase()}</Text></View>}
+                  <View style={{ flex: 1 }}><Text style={styles.personName}>{person.display_name}</Text><Text style={styles.personHandle}>@{person.handle}</Text></View>
+                </Pressable>
+                <Pressable onPress={() => toggleFollow(person.id)} style={[styles.followButton, following.includes(person.id) && styles.followingButton]}><Text style={styles.followText}>{following.includes(person.id) ? 'Following' : 'Follow'}</Text></Pressable>
+              </View>
+            ))}
+            {!searchingPeople && !people.length && <Text style={styles.noPeople}>No matching people found.</Text>}
+          </View>
+        )}
+      </View>
+
+      <SectionHeader title={feedScope === 'public' ? 'Public tastings' : 'From people you follow'} />
       {error && <RetryState message={error} onRetry={onRefresh} />}
-      {!error && !refreshing && !feedPosts.length && (
+      {!error && !refreshing && !visiblePosts.length && (
         <View style={styles.emptyState}>
           <Ionicons name="people-outline" size={36} color={colors.sage} />
-          <Text style={styles.emptyStateTitle}>Your feed is ready</Text>
-          <Text style={styles.emptyStateCopy}>New public tastings from real testers will appear here.</Text>
+          <Text style={styles.emptyStateTitle}>{feedScope === 'following' ? 'Find your cheese people' : 'Your feed is ready'}</Text>
+          <Text style={styles.emptyStateCopy}>{feedScope === 'following' ? 'Search for people above and follow them to build your circle.' : 'New public tastings from real testers will appear here.'}</Text>
         </View>
       )}
-      {feedPosts.filter((post) => catalog.some((item) => item.id === post.cheeseId)).map((post) => {
+      {visiblePosts.filter((post) => catalog.some((item) => item.id === post.cheeseId)).map((post) => {
         const cheese = catalog.find((item) => item.id === post.cheeseId)!;
         const isLiked = liked.includes(post.id);
         return (
@@ -296,6 +376,7 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
   const [comments, setComments] = useState<{ id: string; user_id: string; body: string; created_at: string; profiles: { display_name: string; handle: string } }[]>([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const commentsScrollRef = useRef<ScrollView>(null);
 
   const load = async () => {
     if (!supabase || !post) return;
@@ -336,26 +417,26 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
   return (
     <Modal visible={Boolean(post)} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.commentsPage}>
-        <View style={styles.commentsHeader}>
-          <Pressable style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
-          <Text style={styles.commentsTitle}>Tasting conversation</Text>
-          <View style={{ width: 38 }} />
-        </View>
-        <ScrollView contentContainerStyle={styles.commentsList}>
-          {comments.length ? comments.map((comment) => (
-            <View key={comment.id} style={styles.commentRow}>
-              <View style={styles.commentAvatar}><Text style={styles.commentAvatarText}>{comment.profiles.display_name.charAt(0)}</Text></View>
-              <View style={styles.commentBubble}>
-                <Text style={styles.commentName}>{comment.profiles.display_name} <Text style={styles.commentHandle}>@{comment.profiles.handle}</Text></Text>
-                <Text style={styles.commentBody}>{comment.body}</Text>
+        <KeyboardAvoidingView style={styles.keyboardPage} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.commentsHeader}>
+            <Pressable style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
+            <Text style={styles.commentsTitle}>Tasting conversation</Text>
+            <View style={{ width: 38 }} />
+          </View>
+          <ScrollView ref={commentsScrollRef} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.commentsList}>
+            {comments.length ? comments.map((comment) => (
+              <View key={comment.id} style={styles.commentRow}>
+                <View style={styles.commentAvatar}><Text style={styles.commentAvatarText}>{comment.profiles.display_name.charAt(0)}</Text></View>
+                <View style={styles.commentBubble}>
+                  <Text style={styles.commentName}>{comment.profiles.display_name} <Text style={styles.commentHandle}>@{comment.profiles.handle}</Text></Text>
+                  <Text style={styles.commentBody}>{comment.body}</Text>
+                </View>
+                <Pressable accessibilityLabel="Comment options" onPress={() => manageComment(comment)} style={styles.commentMenu}><Ionicons name="ellipsis-horizontal" size={18} color={colors.muted} /></Pressable>
               </View>
-              <Pressable accessibilityLabel="Comment options" onPress={() => manageComment(comment)} style={styles.commentMenu}><Ionicons name="ellipsis-horizontal" size={18} color={colors.muted} /></Pressable>
-            </View>
-          )) : <Text style={styles.emptyComments}>Start the conversation about this tasting.</Text>}
-        </ScrollView>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            )) : <Text style={styles.emptyComments}>Start the conversation about this tasting.</Text>}
+          </ScrollView>
           <View style={styles.commentComposer}>
-            <TextInput value={body} onChangeText={setBody} placeholder="Add a thoughtful comment…" placeholderTextColor="#9B958A" style={styles.commentInput} multiline />
+            <TextInput value={body} onChangeText={setBody} onFocus={() => setTimeout(() => commentsScrollRef.current?.scrollToEnd({ animated: true }), 200)} placeholder="Add a thoughtful comment…" placeholderTextColor="#9B958A" style={styles.commentInput} multiline />
             <Pressable onPress={send} disabled={sending || !body.trim()} style={styles.commentSend}>
               {sending ? <ActivityIndicator size="small" color={colors.white} /> : <Ionicons name="arrow-up" size={20} color={colors.white} />}
             </Pressable>
@@ -531,8 +612,8 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={styles.keyboardPage} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={styles.logScreenContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
         <AppHeader title="Log a tasting" subtitle="CAPTURE THE MOMENT" unreadCount={unreadCount} onNotifications={onNotifications} />
         <Text style={styles.fieldLabel}>WHAT ARE YOU TASTING?</Text>
         {selected && !pickerOpen ? (
@@ -855,6 +936,7 @@ function CheeseModal({ cheese, userId, onSavedChange, onTastingUpdated, onLog, o
               <Text style={styles.detailStyle} numberOfLines={3}>{cheese.style.toUpperCase()}</Text>
             </View>
           </View>
+          <View style={styles.detailBody}>
           <Text style={styles.detailTitle}>{cheese.name}</Text>
           <Text style={styles.detailMaker}>by {cheese.creamery}</Text>
           <View style={styles.detailRatingRow}>
@@ -896,6 +978,7 @@ function CheeseModal({ cheese, userId, onSavedChange, onTastingUpdated, onLog, o
             <PrimaryButton label="Log a tasting" icon="add-circle-outline" onPress={() => onLog(cheese)} />
             {userId && <Pressable style={styles.reportCheese} onPress={reportCheese}><Ionicons name="flag-outline" size={15} color={colors.muted} /><Text style={styles.reportCheeseText}>Report catalog information</Text></Pressable>}
           </View>
+          </View>
         </ScrollView>
       </SafeAreaView>
       {userId && <EditTastingModal tasting={editTasting} userId={userId} onSaved={() => { setHistoryReload((value) => value + 1); onTastingUpdated(); }} onClose={() => setEditTasting(null)} />}
@@ -903,12 +986,12 @@ function CheeseModal({ cheese, userId, onSavedChange, onTastingUpdated, onLog, o
   );
 }
 
-function NotificationsModal({ visible, userId, onChanged, onClose }: { visible: boolean; userId?: string; onChanged: () => void; onClose: () => void }) {
-  const [items, setItems] = useState<{ id: string; kind: string; read_at: string | null; created_at: string; actor: { display_name: string; handle: string } | null }[]>([]);
+function NotificationsModal({ visible, userId, onChanged, onOpenTarget, onClose }: { visible: boolean; userId?: string; onChanged: () => void; onOpenTarget: (targetType: string, targetId: string) => void; onClose: () => void }) {
+  const [items, setItems] = useState<{ id: string; kind: string; target_type: string; target_id: string; read_at: string | null; created_at: string; actor: { display_name: string; handle: string } | null }[]>([]);
 
   useEffect(() => {
     if (!visible || !supabase || !userId) return;
-    supabase.from('notifications').select('id,kind,read_at,created_at,actor:actor_id(display_name,handle)').eq('user_id', userId).order('created_at', { ascending: false }).limit(50)
+    supabase.from('notifications').select('id,kind,target_type,target_id,read_at,created_at,actor:actor_id(display_name,handle)').eq('user_id', userId).order('created_at', { ascending: false }).limit(50)
       .then(({ data }) => setItems((data ?? []) as unknown as typeof items));
   }, [visible, userId]);
 
@@ -931,6 +1014,15 @@ function NotificationsModal({ visible, userId, onChanged, onClose }: { visible: 
     return 'Your cheese submission needs revision.';
   };
 
+  const openItem = async (item: typeof items[number]) => {
+    if (supabase && !item.read_at) {
+      await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', item.id);
+      onChanged();
+    }
+    onClose();
+    onOpenTarget(item.target_type, item.target_id);
+  };
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.commentsPage}>
@@ -941,11 +1033,12 @@ function NotificationsModal({ visible, userId, onChanged, onClose }: { visible: 
         </View>
         <ScrollView contentContainerStyle={styles.notificationList}>
           {items.length ? items.map((item) => (
-            <View key={item.id} style={[styles.notificationItem, !item.read_at && styles.notificationUnread]}>
+            <Pressable key={item.id} onPress={() => openItem(item)} style={[styles.notificationItem, !item.read_at && styles.notificationUnread]}>
               <View style={styles.notificationIcon}><Ionicons name={item.kind === 'follow' ? 'person-add-outline' : item.kind === 'comment' ? 'chatbubble-outline' : item.kind.includes('account') ? 'shield-outline' : 'heart-outline'} size={19} color={colors.wine} /></View>
               <View style={{ flex: 1 }}><Text style={styles.notificationText}>{message(item)}</Text><Text style={styles.notificationTime}>{new Date(item.created_at).toLocaleDateString()}</Text></View>
               {!item.read_at && <View style={styles.unreadDot} />}
-            </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </Pressable>
           )) : <View style={styles.emptyNotification}><Ionicons name="notifications-outline" size={39} color={colors.sage} /><Text style={styles.emptyNotificationTitle}>All quiet at the cheese table</Text><Text style={styles.emptyComments}>New follows, likes, and comments will appear here.</Text></View>}
         </ScrollView>
       </SafeAreaView>
@@ -1004,12 +1097,33 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [connectionsTab, setConnectionsTab] = useState<'followers' | 'following'>('followers');
   const [publicProfileId, setPublicProfileId] = useState<string | null>(null);
+  const [focusedPostId, setFocusedPostId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [connectionReload, setConnectionReload] = useState(0);
   const openNotifications = () => signedIn ? setNotificationsOpen(true) : Alert.alert('Sign in required', 'Create an account to receive community notifications.');
   const refreshCommunity = () => {
     setFeedReload((value) => value + 1);
     setCatalogReload((value) => value + 1);
+  };
+
+  const openNotificationTarget = async (targetType: string, targetId: string) => {
+    if (targetType === 'profile') {
+      if (targetId === userId) setSafetyOpen(true);
+      else setPublicProfileId(targetId);
+      return;
+    }
+    if (targetType === 'tasting') {
+      setTab('feed');
+      setFocusedPostId(targetId);
+      setFeedReload((value) => value + 1);
+      return;
+    }
+    if (targetType === 'cheese' && supabase) {
+      const { data } = await supabase.from('cheeses').select('slug').eq('id', targetId).maybeSingle();
+      const match = data ? catalog.find((cheese) => cheese.id === data.slug) : null;
+      if (match) setSelectedCheese(match);
+      else Alert.alert('Cheese unavailable', 'This catalog entry is not currently published.');
+    }
   };
 
   const loadUnread = async () => {
@@ -1155,7 +1269,7 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
     return () => subscription.remove();
   }, [usingOfflineData]);
 
-  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} openProfile={setPublicProfileId} catalog={catalog} feedPosts={feedPosts} profile={profile} userId={userId} refreshing={refreshingFeed} error={feedError} unreadCount={unreadCount} onRefresh={refreshCommunity} onLog={() => { setLogCheese(null); setTab('log'); }} onNotifications={openNotifications} />
+  const screen = tab === 'feed' ? <FeedScreen openCheese={setSelectedCheese} openProfile={setPublicProfileId} catalog={catalog} feedPosts={feedPosts} profile={profile} userId={userId} refreshing={refreshingFeed} error={feedError} unreadCount={unreadCount} focusPostId={focusedPostId} onFocusHandled={() => setFocusedPostId(null)} onRefresh={refreshCommunity} onLog={() => { setLogCheese(null); setTab('log'); }} onNotifications={openNotifications} />
     : tab === 'discover' ? <DiscoverScreen openCheese={setSelectedCheese} catalog={catalog} loading={catalogLoading} error={catalogError} unreadCount={unreadCount} onRetry={() => setCatalogReload((value) => value + 1)} onNotifications={openNotifications} />
     : tab === 'log' ? <LogScreen onComplete={() => { refreshCommunity(); setLogCheese(null); setTab('feed'); }} catalog={catalog} initialCheese={logCheese} userId={userId} unreadCount={unreadCount} onNotifications={openNotifications} />
     : tab === 'cellar' ? <CellarScreen openCheese={setSelectedCheese} catalog={catalog} userId={userId} reload={feedReload + savedReload} unreadCount={unreadCount} onNotifications={openNotifications} />
@@ -1182,7 +1296,7 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
       </View>
       <CheeseModal cheese={selectedCheese} userId={userId} onSavedChange={() => setSavedReload((value) => value + 1)} onTastingUpdated={refreshCommunity} onLog={(cheese) => { setSelectedCheese(null); setLogCheese(cheese); setTab('log'); }} onClose={() => setSelectedCheese(null)} />
       {profile && userId && <CatalogManagement visible={catalogManagementOpen} role={profile.role} userId={userId} onClose={() => { setCatalogManagementOpen(false); setCatalogReload((value) => value + 1); }} />}
-      <NotificationsModal visible={notificationsOpen} userId={userId} onChanged={loadUnread} onClose={() => setNotificationsOpen(false)} />
+      <NotificationsModal visible={notificationsOpen} userId={userId} onChanged={loadUnread} onOpenTarget={openNotificationTarget} onClose={() => setNotificationsOpen(false)} />
       {userId && <SafetyCenter visible={safetyOpen} userId={userId} onClose={() => setSafetyOpen(false)} />}
       {profile && <EditProfileModal visible={editProfileOpen} profile={profile} onSaved={() => { onProfileUpdated(); refreshCommunity(); }} onClose={() => setEditProfileOpen(false)} />}
       {userId && <ConnectionsModal visible={connectionsOpen} userId={userId} initialTab={connectionsTab} onChanged={() => setConnectionReload((value) => value + 1)} onOpenProfile={(id) => { setConnectionsOpen(false); setPublicProfileId(id); }} onClose={() => setConnectionsOpen(false)} />}
@@ -1269,6 +1383,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper },
+  keyboardPage: { flex: 1 },
   offlineBanner: { minHeight: 34, paddingHorizontal: 14, backgroundColor: colors.wine, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   offlineBannerText: { color: colors.white, fontSize: 10, fontWeight: '800' },
   authLoading: { flex: 1, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
@@ -1303,6 +1418,23 @@ const styles = StyleSheet.create({
   promptStat: { fontSize: 11, color: colors.muted },
   promptStatStrong: { color: colors.ink, fontWeight: '900' },
   miniDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.gold },
+  feedTools: { marginBottom: 20 },
+  feedScopePicker: { height: 42, padding: 4, borderRadius: 15, backgroundColor: colors.cream, flexDirection: 'row' },
+  feedScopeButton: { flex: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  feedScopeButtonActive: { backgroundColor: colors.white, ...shadow },
+  feedScopeText: { color: colors.muted, fontSize: 11, fontWeight: '800' },
+  feedScopeTextActive: { color: colors.wine },
+  peopleSearch: { height: 50, marginTop: 10, paddingHorizontal: 14, borderRadius: 15, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center' },
+  peopleResults: { marginTop: 8, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, borderRadius: 16, overflow: 'hidden' },
+  personResult: { minHeight: 64, paddingHorizontal: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  personIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  personAvatar: { width: 40, height: 40, borderRadius: 20 },
+  personAvatarFallback: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.sage, alignItems: 'center', justifyContent: 'center' },
+  personAvatarText: { color: colors.white, fontSize: 12, fontWeight: '800' },
+  personName: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  personHandle: { color: colors.muted, fontSize: 10, marginTop: 2 },
+  followingButton: { backgroundColor: colors.cream },
+  noPeople: { color: colors.muted, fontSize: 11, textAlign: 'center', padding: 18 },
   postCard: { backgroundColor: colors.white, borderRadius: 23, marginBottom: 23, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', ...shadow },
   postHeader: { padding: 15, flexDirection: 'row', alignItems: 'center', gap: 10 },
   postAvatar: { width: 39, height: 39, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
@@ -1359,6 +1491,7 @@ const styles = StyleSheet.create({
   searchBox: { height: 52, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, marginTop: 9, ...shadow },
   searchInput: { flex: 1, paddingHorizontal: 10, color: colors.ink, fontSize: 14 },
   searchHint: { color: colors.muted, fontSize: 10, marginTop: 8, marginBottom: 10 },
+  logScreenContent: { paddingHorizontal: 20, paddingBottom: 140 },
   cheesePickerResults: { maxHeight: 225, marginBottom: 8 },
   selectedCheeseSummary: { minHeight: 70, padding: 11, borderRadius: 17, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: 11, ...shadow },
   changeCheese: { color: colors.wine, fontSize: 11, fontWeight: '800' },
@@ -1462,6 +1595,7 @@ const styles = StyleSheet.create({
   logButton: { width: 49, height: 49, marginTop: -28, borderRadius: 25, backgroundColor: colors.wine, borderWidth: 4, borderColor: colors.paper, alignItems: 'center', justifyContent: 'center', ...shadow },
   modalSafe: { flex: 1, backgroundColor: colors.paper },
   detailContent: { paddingBottom: 30 },
+  detailBody: { width: '94%', maxWidth: 680, alignSelf: 'center' },
   modalHeader: { height: 66, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   modalButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   detailHero: { height: 290, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
@@ -1472,11 +1606,11 @@ const styles = StyleSheet.create({
   detailMaker: { color: colors.wine, textAlign: 'center', fontSize: 13, fontWeight: '700', marginTop: 5 },
   detailRatingRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9, marginTop: 13 },
   detailLogs: { color: colors.muted, fontSize: 10 },
-  detailDescription: { color: colors.muted, fontSize: 14, lineHeight: 22, textAlign: 'center', paddingHorizontal: 31, marginTop: 19 },
+  detailDescription: { color: colors.muted, fontSize: 14, lineHeight: 22, textAlign: 'left', paddingHorizontal: 24, marginTop: 19 },
   facts: { margin: 20, paddingVertical: 18, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line, flexDirection: 'row', flexWrap: 'wrap' },
   fact: { width: '50%', paddingVertical: 9, paddingHorizontal: 12 },
   factLabel: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1.3 },
-  factValue: { color: colors.ink, fontSize: 13, fontWeight: '700', marginTop: 4 },
+  factValue: { color: colors.ink, fontSize: 13, lineHeight: 18, fontWeight: '700', marginTop: 4 },
   detailNotes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20 },
   detailSection: { marginTop: 8 },
   detailNote: { paddingHorizontal: 13, paddingVertical: 9, backgroundColor: colors.cream, borderRadius: 16 },
