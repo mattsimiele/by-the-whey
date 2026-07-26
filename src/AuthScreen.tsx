@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,30 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [appleSignInAvailable, setAppleSignInAvailable] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (
+      Platform.OS !== 'ios'
+      || !UIManager.getViewManagerConfig('ViewManagerAdapter_ExpoAppleAuthentication')
+    ) {
+      return undefined;
+    }
+
+    AppleAuthentication.isAvailableAsync()
+      .then((available) => {
+        if (mounted) setAppleSignInAvailable(available);
+      })
+      .catch(() => {
+        if (mounted) setAppleSignInAvailable(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const submit = async () => {
     if (!supabase) {
@@ -179,7 +204,7 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
             )}
           </View>
           {mode === 'signIn' && <Pressable onPress={resetPassword} style={styles.forgot}><Text style={styles.forgotText}>Forgot password?</Text></Pressable>}
-          {Platform.OS === 'ios' && (
+          {appleSignInAvailable && (
             <>
               <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>OR</Text><View style={styles.orLine} /></View>
               <AppleAuthentication.AppleAuthenticationButton
