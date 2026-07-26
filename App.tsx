@@ -415,9 +415,9 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
   };
 
   return (
-    <Modal visible={Boolean(post)} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={Boolean(post)} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={styles.commentsPage}>
-        <KeyboardAvoidingView style={styles.keyboardPage} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={styles.keyboardPage} behavior="height">
           <View style={styles.commentsHeader}>
             <Pressable style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
             <Text style={styles.commentsTitle}>Tasting conversation</Text>
@@ -519,6 +519,9 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
   const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [photo, setPhoto] = useState<{ uri: string; base64: string; mimeType: string } | null>(null);
+  const logScrollRef = useRef<ScrollView>(null);
+  const notePosition = useRef(0);
+  const locationPosition = useRef(0);
   const cheeseResults = useMemo(() => {
     const normalized = cheeseQuery.trim().toLowerCase();
     if (!normalized) return catalog.slice(0, 12);
@@ -531,6 +534,13 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
     setCheeseQuery('');
     setPickerOpen(false);
   }, [initialCheese]);
+
+  const revealField = (position: React.MutableRefObject<number>) => {
+    setPickerOpen(false);
+    setTimeout(() => {
+      logScrollRef.current?.scrollTo({ y: Math.max(0, position.current - 90), animated: true });
+    }, 250);
+  };
 
   const pickPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -612,8 +622,8 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
   };
 
   return (
-    <KeyboardAvoidingView style={styles.keyboardPage} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView contentContainerStyle={styles.logScreenContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
+    <KeyboardAvoidingView style={styles.keyboardPage} behavior="height">
+      <ScrollView ref={logScrollRef} contentContainerStyle={styles.logScreenContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
         <AppHeader title="Log a tasting" subtitle="CAPTURE THE MOMENT" unreadCount={unreadCount} onNotifications={onNotifications} />
         <Text style={styles.fieldLabel}>WHAT ARE YOU TASTING?</Text>
         {selected && !pickerOpen ? (
@@ -660,6 +670,8 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
         <TextInput
           value={note}
           onChangeText={setNote}
+          onLayout={(event) => { notePosition.current = event.nativeEvent.layout.y; }}
+          onFocus={() => revealField(notePosition)}
           multiline
           placeholder="What did you notice? Texture, aroma, flavor, pairing…"
           placeholderTextColor="#9B958A"
@@ -675,9 +687,9 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
             <View style={{ flex: 1 }}><Text style={styles.addOnText}>{photo ? 'Photo selected' : 'Add photo'}</Text>{photo && <Text style={styles.addOnSub}>Tap to choose a different image</Text>}</View>
             <Ionicons name="chevron-forward" size={17} color={colors.muted} />
           </Pressable>
-          <View style={styles.locationEditor}>
+          <View style={styles.locationEditor} onLayout={(event) => { locationPosition.current = event.nativeEvent.layout.y; }}>
             <Ionicons name="location-outline" size={21} color={colors.wine} />
-            <TextInput value={locationName} onChangeText={setLocationName} placeholder="Where did you taste it? (optional)" placeholderTextColor="#9B958A" style={styles.locationInput} />
+            <TextInput value={locationName} onChangeText={setLocationName} onFocus={() => revealField(locationPosition)} placeholder="Where did you taste it? (optional)" placeholderTextColor="#9B958A" style={styles.locationInput} />
           </View>
           <Pressable style={styles.addOn} onPress={() => setIsPublic(!isPublic)}>
             <Ionicons name={isPublic ? 'people-outline' : 'lock-closed-outline'} size={21} color={colors.wine} />
