@@ -32,6 +32,10 @@ If Node.js and pnpm are installed globally, `pnpm install` followed by `pnpm sta
 
 Android EAS preview and production profiles, Play listing copy, Data Safety notes, content declarations, tester instructions, artwork, and the release runbook are ready. Start with [`docs/ANDROID_BETA_RELEASE.md`](docs/ANDROID_BETA_RELEASE.md).
 
+## Store release automation
+
+Run `pnpm release` to start `.eas/workflows/release.yml`. The workflow builds iOS, uploads the successful build to TestFlight, and then builds the Android App Bundle. Production build numbers are incremented remotely by EAS. Android submission remains a separate step until the Google Play service-account key is uploaded to EAS.
+
 ## Product roles
 
 - **Turophile:** browse the approved catalog, log tastings, follow people, and interact with posts.

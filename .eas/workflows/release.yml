@@ -1,0 +1,29 @@
+name: Release to TestFlight and build Android
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build_ios:
+    name: Build iOS
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  testflight:
+    name: Upload to TestFlight
+    needs: [build_ios]
+    type: testflight
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production
+      changelog: Version 0.2.0 adds feed filters, people search, actionable notifications, improved authentication redirects, and mobile layout refinements.
+
+  build_android:
+    name: Build Android after TestFlight
+    needs: [testflight]
+    type: build
+    params:
+      platform: android
+      profile: production
