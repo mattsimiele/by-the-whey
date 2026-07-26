@@ -416,7 +416,8 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
 
   return (
     <Modal visible={Boolean(post)} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <SafeAreaView style={styles.commentsPage}>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.commentsPage} edges={['top', 'right', 'bottom', 'left']}>
         <KeyboardAvoidingView style={styles.keyboardPage} behavior="height">
           <View style={styles.commentsHeader}>
             <Pressable style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
@@ -442,7 +443,8 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
             </Pressable>
           </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }

@@ -48,7 +48,7 @@ type CatalogPhotoReview = { id: string; cheese_id: string; storage_path: string;
 type Account = { id: string; display_name: string; handle: string; role: Role; account_status: 'active' | 'warned' | 'suspended'; warning_count: number; moderation_note: string | null };
 
 export function CatalogManagement({ visible, role, userId, onClose }: { visible: boolean; role: Role; userId: string; onClose: () => void }) {
-  const [tab, setTab] = useState<'submit' | 'review' | 'photos' | 'reports' | 'users'>(role === 'admin' ? 'review' : 'submit');
+  const [tab, setTab] = useState<'submit' | 'catalog' | 'review' | 'photos' | 'reports' | 'users'>(role === 'admin' ? 'review' : 'submit');
   const [draft, setDraft] = useState(emptyDraft);
   const [editingCheeseId, setEditingCheeseId] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -59,6 +59,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
   const [catalogPhotos, setCatalogPhotos] = useState<CatalogPhotoReview[]>([]);
   const [catalogCheeses, setCatalogCheeses] = useState<{ id: string; name: string; creamery_name: string }[]>([]);
   const [catalogPhotoSearch, setCatalogPhotoSearch] = useState('');
+  const [catalogEditSearch, setCatalogEditSearch] = useState('');
   const [draftPhoto, setDraftPhoto] = useState<{ uri: string; base64: string; mimeType: string } | null>(null);
 
   const loadSubmissions = async () => {
@@ -227,8 +228,8 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     ]);
   };
 
-  const editReportedCheese = async (report: Report) => {
-    const { data, error } = await supabase!.from('cheeses').select('*').eq('id', report.target_id).single();
+  const openCheeseEditor = async (cheeseId: string) => {
+    const { data, error } = await supabase!.from('cheeses').select('*').eq('id', cheeseId).single();
     if (error || !data) return Alert.alert('Could not open cheese', error?.message ?? 'Cheese not found.');
     setDraft({
       name: data.name, creamery_name: data.creamery_name, location_city: data.location_city,
@@ -238,9 +239,12 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
       flavor_profile: (data.flavor_profile ?? []).join(', '), story_notes: data.story_notes,
       pairings: (data.pairings ?? []).join(', '),
     });
-    setEditingCheeseId(report.target_id);
+    setEditingCheeseId(cheeseId);
+    setDraftPhoto(null);
     setTab('submit');
   };
+
+  const editReportedCheese = (report: Report) => openCheeseEditor(report.target_id);
 
   const setAccountStatus = (account: Account, next: 'active' | 'warned' | 'suspended') => {
     Alert.alert(`${next === 'active' ? 'Restore' : next === 'warned' ? 'Warn' : 'Suspend'} account?`, `This will update @${account.handle}'s access and notify them.`, [
@@ -362,9 +366,9 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
           <View style={{ width: 38 }} />
         </View>
         {role === 'admin' && (
-          <View style={styles.tabs}>
-            {(['review', 'photos', 'reports', 'submit', 'users'] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item === 'review' ? `Cheese ${submissions.length}` : item === 'photos' ? `Photos ${photos.length}` : item === 'reports' ? `Reports ${reports.length}` : item === 'submit' ? 'Add' : 'Users'}</Text></Pressable>)}
-          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+            {(['review', 'catalog', 'photos', 'reports', 'submit', 'users'] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item === 'review' ? `Review ${submissions.length}` : item === 'catalog' ? 'Edit catalog' : item === 'photos' ? `Photos ${photos.length}` : item === 'reports' ? `Reports ${reports.length}` : item === 'submit' ? 'Add' : 'Users'}</Text></Pressable>)}
+          </ScrollView>
         )}
         {tab === 'submit' ? (
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -380,6 +384,21 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
             <Pressable onPress={chooseDraftPhoto} style={styles.photoPicker}><Ionicons name="image-outline" size={18} color={colors.wine} /><Text style={styles.rejectText}>{draftPhoto ? 'Choose a different photo' : 'Add real catalog photo'}</Text></Pressable>
             <Text style={styles.helper}>{role === 'admin' ? 'Administrator photos publish immediately.' : 'The photo stays private until an administrator approves it.'}</Text>
             {saving ? <ActivityIndicator color={colors.wine} /> : <PrimaryButton label={editingCheeseId ? 'Save correction' : 'Submit for review'} icon="arrow-forward" onPress={submit} />}
+          </ScrollView>
+        ) : tab === 'catalog' ? (
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <Text style={styles.helper}>Search the published catalog and open any cheese to correct its information.</Text>
+            <TextInput value={catalogEditSearch} onChangeText={setCatalogEditSearch} placeholder="Search cheese or creamery…" placeholderTextColor="#9B958A" style={styles.input} />
+            {catalogCheeses
+              .filter((item) => !catalogEditSearch.trim() || `${item.name} ${item.creamery_name}`.toLowerCase().includes(catalogEditSearch.trim().toLowerCase()))
+              .slice(0, 40)
+              .map((item) => (
+                <View key={item.id} style={styles.catalogPhotoRow}>
+                  <View style={{ flex: 1 }}><Text style={styles.accountName}>{item.name}</Text><Text style={styles.submitter}>{item.creamery_name}</Text></View>
+                  <Pressable onPress={() => openCheeseEditor(item.id)} style={styles.roleToggle}><Text style={styles.roleToggleText}>Edit info</Text></Pressable>
+                </View>
+              ))}
+            {!catalogCheeses.length && <ActivityIndicator color={colors.wine} />}
           </ScrollView>
         ) : tab === 'review' ? (
           <ScrollView contentContainerStyle={styles.content}>
@@ -484,8 +503,8 @@ const styles = StyleSheet.create({
   close: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   kicker: { color: colors.wine, textAlign: 'center', fontSize: 8, fontWeight: '900', letterSpacing: 1.5 },
   title: { color: colors.ink, fontSize: 17, fontWeight: '800', marginTop: 2 },
-  tabs: { flexDirection: 'row', margin: 16, padding: 4, height: 44, backgroundColor: colors.cream, borderRadius: 14 },
-  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
+  tabs: { marginHorizontal: 16, marginVertical: 12, padding: 4, minHeight: 44, backgroundColor: colors.cream, borderRadius: 14, gap: 4 },
+  tab: { minWidth: 82, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
   tabActive: { backgroundColor: colors.white },
   tabText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   tabTextActive: { color: colors.wine },
