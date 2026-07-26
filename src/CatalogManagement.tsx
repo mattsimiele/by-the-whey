@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
@@ -375,8 +375,9 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
             {(['review', 'catalog', 'photos', 'reports', 'submit', 'users'] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item === 'review' ? `Review ${submissions.length}` : item === 'catalog' ? 'Edit catalog' : item === 'photos' ? `Photos ${photos.length}` : item === 'reports' ? `Reports ${reports.length}` : item === 'submit' ? 'Add' : 'Users'}</Text></Pressable>)}
           </ScrollView>
         )}
+        <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {tab === 'submit' ? (
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} automaticallyAdjustKeyboardInsets>
             <Text style={styles.helper}>{editingCheeseId ? 'Correct the reported information. Saving republishes the entry.' : 'Every field is required so the catalog remains useful and consistent.'}</Text>
             {fields.map((field) => (
               <View key={field.key}>
@@ -391,7 +392,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
             {saving ? <ActivityIndicator color={colors.wine} /> : <PrimaryButton label={editingCheeseId ? 'Save correction' : 'Submit for review'} icon="arrow-forward" onPress={submit} />}
           </ScrollView>
         ) : tab === 'catalog' ? (
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} automaticallyAdjustKeyboardInsets>
             <Text style={styles.helper}>Search the published catalog and open any cheese to correct its information.</Text>
             <TextInput value={catalogEditSearch} onChangeText={setCatalogEditSearch} placeholder="Search cheese or creamery…" placeholderTextColor="#9B958A" style={styles.input} />
             {catalogCheeses
@@ -423,7 +424,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
             ))}
           </ScrollView>
         ) : tab === 'photos' ? (
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} automaticallyAdjustKeyboardInsets>
             <Text style={styles.queueHeading}>Add to existing catalog</Text>
             <TextInput value={catalogPhotoSearch} onChangeText={setCatalogPhotoSearch} placeholder="Search cheeses…" placeholderTextColor="#9B958A" style={styles.input} />
             {catalogPhotoSearch.trim().length > 1 && catalogCheeses.filter((item) => `${item.name} ${item.creamery_name}`.toLowerCase().includes(catalogPhotoSearch.trim().toLowerCase())).slice(0, 8).map((item) => (
@@ -497,6 +498,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
             ))}
           </ScrollView>
         )}
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );
@@ -504,6 +506,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.paper },
+  keyboardArea: { flex: 1 },
   header: { height: 70, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.line },
   close: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   kicker: { color: colors.wine, textAlign: 'center', fontSize: 8, fontWeight: '900', letterSpacing: 1.5 },
