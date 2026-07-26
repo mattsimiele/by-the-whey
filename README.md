@@ -34,7 +34,7 @@ Android EAS preview and production profiles, Play listing copy, Data Safety note
 
 ## Store release automation
 
-Run `pnpm release` to start `.eas/workflows/release.yml`. The workflow builds iOS, uploads the successful build to TestFlight, and then builds the Android App Bundle. Production build numbers are incremented remotely by EAS. Android submission remains a separate step until the Google Play service-account key is uploaded to EAS.
+Run `pnpm release` to build iOS, automatically submit the successful build to TestFlight, and then build the Android App Bundle. The command uses the free-plan-compatible EAS CLI flow and only starts Android after the iOS build and handoff succeed. Production build numbers are incremented remotely by EAS. Android submission remains a separate step until the Google Play service-account key is uploaded to EAS.
 
 ## Product roles
 
