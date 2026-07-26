@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Brand, PrimaryButton } from './components';
 import { supabase } from './lib/supabase';
 import { colors, shadow } from './theme';
@@ -151,8 +152,9 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={styles.page} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.brandWrap}><Brand /></View>
         <View style={styles.hero}>
           <View style={styles.wheel}>
@@ -223,8 +225,9 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
           <Text style={styles.guestText}>Explore as a guest</Text>
           <Ionicons name="arrow-forward" size={15} color={colors.wine} />
         </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
