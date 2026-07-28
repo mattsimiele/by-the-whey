@@ -2,7 +2,7 @@
   "expo": {
     "name": "By the Whey",
     "slug": "by-the-whey",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "icon": "./assets/icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
