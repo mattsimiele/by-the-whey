@@ -1090,7 +1090,7 @@ function PasswordResetModal({ visible, onClose }: { visible: boolean; onClose: (
   );
 }
 
-function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserProfile | null; signedIn: boolean; userId?: string; onProfileUpdated: () => void }) {
+function Root({ profile, signedIn, userId, onAccountDeleted, onProfileUpdated }: { profile: UserProfile | null; signedIn: boolean; userId?: string; onAccountDeleted: () => void; onProfileUpdated: () => void }) {
   const [tab, setTab] = useState<Tab>('feed');
   const [selectedCheese, setSelectedCheese] = useState<Cheese | null>(null);
   const [logCheese, setLogCheese] = useState<Cheese | null>(null);
@@ -1311,7 +1311,7 @@ function Root({ profile, signedIn, userId, onProfileUpdated }: { profile: UserPr
       <CheeseModal cheese={selectedCheese} userId={userId} onSavedChange={() => setSavedReload((value) => value + 1)} onTastingUpdated={refreshCommunity} onLog={(cheese) => { setSelectedCheese(null); setLogCheese(cheese); setTab('log'); }} onClose={() => setSelectedCheese(null)} />
       {profile && userId && <CatalogManagement visible={catalogManagementOpen} role={profile.role} userId={userId} onClose={() => { setCatalogManagementOpen(false); setCatalogReload((value) => value + 1); }} />}
       <NotificationsModal visible={notificationsOpen} userId={userId} onChanged={loadUnread} onOpenTarget={openNotificationTarget} onClose={() => setNotificationsOpen(false)} />
-      {userId && <SafetyCenter visible={safetyOpen} userId={userId} onClose={() => setSafetyOpen(false)} />}
+      {userId && <SafetyCenter visible={safetyOpen} userId={userId} onAccountDeleted={onAccountDeleted} onClose={() => setSafetyOpen(false)} />}
       {profile && <EditProfileModal visible={editProfileOpen} profile={profile} onSaved={() => { onProfileUpdated(); refreshCommunity(); }} onClose={() => setEditProfileOpen(false)} />}
       {userId && <ConnectionsModal visible={connectionsOpen} userId={userId} initialTab={connectionsTab} onChanged={() => setConnectionReload((value) => value + 1)} onOpenProfile={(id) => { setConnectionsOpen(false); setPublicProfileId(id); }} onClose={() => setConnectionsOpen(false)} />}
       <PublicProfileModal profileId={publicProfileId} currentUserId={userId} onChanged={() => { setConnectionReload((value) => value + 1); refreshCommunity(); }} onClose={() => setPublicProfileId(null)} />
@@ -1339,7 +1339,10 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       if (nextSession) setGuest(false);
-      if (!nextSession) setProfile(null);
+      if (!nextSession) {
+        setGuest(false);
+        setProfile(null);
+      }
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
     });
     return () => listener.subscription.unsubscribe();
@@ -1386,7 +1389,18 @@ export default function App() {
       {loadingSession ? (
         <SafeAreaView style={styles.authLoading}><ActivityIndicator color={colors.wine} /></SafeAreaView>
       ) : session || guest || !isSupabaseConfigured ? (
-        <Root profile={profile} signedIn={Boolean(session)} userId={session?.user.id} onProfileUpdated={() => setProfileReload((value) => value + 1)} />
+        <Root
+          profile={profile}
+          signedIn={Boolean(session)}
+          userId={session?.user.id}
+          onAccountDeleted={() => {
+            setSession(null);
+            setGuest(false);
+            setProfile(null);
+            setPasswordRecovery(false);
+          }}
+          onProfileUpdated={() => setProfileReload((value) => value + 1)}
+        />
       ) : (
         <AuthScreen onGuest={() => setGuest(true)} />
       )}

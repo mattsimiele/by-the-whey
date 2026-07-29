@@ -18,7 +18,7 @@ const pages: { id: Page; label: string }[] = [
   { id: 'support', label: 'Support' },
 ];
 
-export function SafetyCenter({ visible, userId, onClose }: { visible: boolean; userId: string; onClose: () => void }) {
+export function SafetyCenter({ visible, userId, onAccountDeleted, onClose }: { visible: boolean; userId: string; onAccountDeleted: () => void; onClose: () => void }) {
   const [page, setPage] = useState<Page>('safety');
   const [blocked, setBlocked] = useState<BlockedAccount[]>([]);
   const [deleting, setDeleting] = useState(false);
@@ -134,7 +134,9 @@ export function SafetyCenter({ visible, userId, onClose }: { visible: boolean; u
                   const { error } = await supabase.rpc('delete_my_account');
                   setDeleting(false);
                   if (error) return Alert.alert('Could not delete account', error.message);
+                  await supabase.auth.signOut({ scope: 'local' });
                   onClose();
+                  onAccountDeleted();
                 },
               },
             ],
