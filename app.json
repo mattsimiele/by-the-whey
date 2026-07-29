@@ -95,6 +95,12 @@
           "microphonePermission": false
         }
       ],
+      [
+        "expo-web-browser",
+        {
+          "experimentalLauncherActivity": false
+        }
+      ],
       "expo-font"
     ],
     "extra": {

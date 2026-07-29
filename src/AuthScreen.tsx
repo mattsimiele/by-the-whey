@@ -15,10 +15,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Brand, PrimaryButton } from './components';
 import { supabase } from './lib/supabase';
 import { colors, shadow } from './theme';
+
+WebBrowser.maybeCompleteAuthSession();
 
 type Mode = 'signIn' | 'signUp';
 
@@ -152,6 +156,53 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
     }
   };
 
+  const signInWithGoogle = async () => {
+    if (!supabase) return;
+    setBusy(true);
+    try {
+      const redirectTo = Linking.createURL('auth/callback');
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+      if (error) throw error;
+      if (!data.url) throw new Error('Google did not return a sign-in URL.');
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      if (result.type !== 'success') return;
+
+      const parameterText = result.url.includes('#')
+        ? result.url.split('#')[1]
+        : result.url.split('?')[1] ?? '';
+      const parameters = new URLSearchParams(parameterText);
+      const callbackError = parameters.get('error_description') ?? parameters.get('error');
+      if (callbackError) throw new Error(decodeURIComponent(callbackError.replace(/\+/g, ' ')));
+
+      const code = parameters.get('code');
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) throw exchangeError;
+        return;
+      }
+
+      const accessToken = parameters.get('access_token');
+      const refreshToken = parameters.get('refresh_token');
+      if (!accessToken || !refreshToken) throw new Error('Google sign-in did not return a valid session.');
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (sessionError) throw sessionError;
+    } catch (error) {
+      Alert.alert('Google Sign-In failed', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.page} edges={['top', 'bottom']}>
       <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -207,9 +258,19 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
             )}
           </View>
           {mode === 'signIn' && <Pressable onPress={resetPassword} style={styles.forgot}><Text style={styles.forgotText}>Forgot password?</Text></Pressable>}
+          <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>OR</Text><View style={styles.orLine} /></View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
+            disabled={busy}
+            onPress={signInWithGoogle}
+            style={({ pressed }) => [styles.googleButton, pressed && styles.socialButtonPressed, busy && styles.socialButtonDisabled]}
+          >
+            <Ionicons name="logo-google" size={20} color="#4285F4" />
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </Pressable>
           {appleSignInAvailable && (
             <>
-              <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>OR</Text><View style={styles.orLine} /></View>
               <AppleAuthentication.AppleAuthenticationButton
                 buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
                 buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
@@ -260,7 +321,11 @@ const styles = StyleSheet.create({
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 },
   orLine: { flex: 1, height: 1, backgroundColor: colors.line },
   orText: { color: colors.muted, fontSize: 8, fontWeight: '800' },
-  appleButton: { width: '100%', height: 50 },
+  googleButton: { width: '100%', height: 50, borderWidth: 1, borderColor: colors.line, borderRadius: 14, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  googleButtonText: { color: colors.ink, fontSize: 13, fontWeight: '700' },
+  socialButtonPressed: { opacity: 0.78 },
+  socialButtonDisabled: { opacity: 0.55 },
+  appleButton: { width: '100%', height: 50, marginTop: 10 },
   guest: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 20, padding: 10 },
   guestText: { color: colors.wine, fontSize: 12, fontWeight: '800' },
 });

@@ -49,7 +49,7 @@ Production authorization must be enforced with database policies, not only hidde
 Supabase is the intended backend:
 
 - Postgres for structured cheese and social data
-- Auth for user accounts and Apple sign-in
+- Auth for email, Google, and Apple sign-in
 - Storage for tasting and cheese photos
 - Realtime for feed interactions and notifications
 - Row Level Security for role-aware permissions
@@ -63,6 +63,7 @@ See [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) for the proposed schema and polic
 3. Copy `.env.example` to `.env`.
 4. Add the project URL and publishable key from Supabase Project Settings → API.
 5. In Authentication → URL Configuration, set the Site URL to `https://www.thecurdnerd.com/by-the-whey` and add `https://www.thecurdnerd.com/by-the-whey**` plus `bythewhey://**` to the redirect allow list. This keeps confirmation emails off localhost while preserving in-app password recovery.
+6. Follow [`docs/GOOGLE_AUTH_SETUP.md`](docs/GOOGLE_AUTH_SETUP.md) to enable Google sign-in for iOS and Android.
 
 Never place a service-role key or database password in the mobile app.
 
