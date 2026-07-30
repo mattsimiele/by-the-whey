@@ -1,12 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const encode = (value: Uint8Array | string) => {
-  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
-  return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
-};
-
-const pemBytes = (pem: string) =>
-  Uint8Array.from(atob(pem.replace(/-----[^-]+-----/g, '').replace(/\s/g, '')), (character) => character.charCodeAt(0));
+import { importPKCS8, SignJWT } from 'https://deno.land/x/jose@v5.9.6/index.ts';
 
 Deno.serve(async (request) => {
   try {
@@ -21,16 +14,24 @@ Deno.serve(async (request) => {
     const { authorizationCode } = await request.json();
     if (!authorizationCode) return new Response('Apple authorization code is required', { status: 400 });
 
-    const teamId = Deno.env.get('APPLE_TEAM_ID')!;
-    const keyId = Deno.env.get('APPLE_KEY_ID')!;
-    const clientId = Deno.env.get('APPLE_CLIENT_ID')!;
-    const privateKey = Deno.env.get('APPLE_PRIVATE_KEY')!.replaceAll('\\n', '\n');
+    const teamId = Deno.env.get('APPLE_TEAM_ID');
+    const keyId = Deno.env.get('APPLE_KEY_ID');
+    const clientId = Deno.env.get('APPLE_CLIENT_ID');
+    const privateKey = Deno.env.get('APPLE_PRIVATE_KEY')?.replaceAll('\\n', '\n');
+    if (!teamId || !keyId || !clientId || !privateKey) {
+      return Response.json({ error: 'Apple revocation is not configured' }, { status: 500 });
+    }
+
     const now = Math.floor(Date.now() / 1000);
-    const header = encode(JSON.stringify({ alg: 'ES256', kid: keyId }));
-    const payload = encode(JSON.stringify({ iss: teamId, iat: now, exp: now + 300, aud: 'https://appleid.apple.com', sub: clientId }));
-    const key = await crypto.subtle.importKey('pkcs8', pemBytes(privateKey), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
-    const signature = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(`${header}.${payload}`)));
-    const clientSecret = `${header}.${payload}.${encode(signature)}`;
+    const key = await importPKCS8(privateKey, 'ES256');
+    const clientSecret = await new SignJWT({})
+      .setProtectedHeader({ alg: 'ES256', kid: keyId })
+      .setIssuer(teamId)
+      .setIssuedAt(now)
+      .setExpirationTime(now + 300)
+      .setAudience('https://appleid.apple.com')
+      .setSubject(clientId)
+      .sign(key);
 
     const tokenResponse = await fetch('https://appleid.apple.com/auth/token', {
       method: 'POST',
@@ -44,7 +45,15 @@ Deno.serve(async (request) => {
     });
     const tokenData = await tokenResponse.json();
     if (!tokenResponse.ok || !tokenData.refresh_token) {
-      return Response.json({ error: 'Apple token exchange failed', detail: tokenData }, { status: 502 });
+      console.error('Apple token exchange failed', {
+        status: tokenResponse.status,
+        error: tokenData.error,
+        description: tokenData.error_description,
+      });
+      return Response.json({
+        error: 'Apple token exchange failed',
+        detail: tokenData.error_description ?? tokenData.error ?? `Apple returned status ${tokenResponse.status}`,
+      }, { status: 502 });
     }
 
     const revokeResponse = await fetch('https://appleid.apple.com/auth/revoke', {
@@ -57,7 +66,13 @@ Deno.serve(async (request) => {
         token_type_hint: 'refresh_token',
       }),
     });
-    if (!revokeResponse.ok) return new Response('Apple token revocation failed', { status: 502 });
+    if (!revokeResponse.ok) {
+      console.error('Apple token revocation failed', { status: revokeResponse.status });
+      return Response.json({
+        error: 'Apple token revocation failed',
+        detail: `Apple returned status ${revokeResponse.status}`,
+      }, { status: 502 });
+    }
     return Response.json({ revoked: true });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : 'Unexpected error' }, { status: 500 });

@@ -95,7 +95,26 @@ export function SafetyCenter({ visible, userId, onAccountDeleted, onClose }: { v
                       const { error: revokeError } = await supabase.functions.invoke('revoke-apple-token', {
                         body: { authorizationCode: credential.authorizationCode },
                       });
-                      if (revokeError) throw revokeError;
+                      if (revokeError) {
+                        const response = (revokeError as { context?: Response }).context;
+                        if (response) {
+                          try {
+                            const payload = await response.clone().json() as {
+                              error?: string;
+                              detail?: { error?: string; error_description?: string } | string;
+                            };
+                            const detail = typeof payload.detail === 'string'
+                              ? payload.detail
+                              : payload.detail?.error_description ?? payload.detail?.error;
+                            throw new Error(detail ?? payload.error ?? revokeError.message);
+                          } catch (responseError) {
+                            if (responseError instanceof Error && responseError.message !== 'Unexpected end of JSON input') {
+                              throw responseError;
+                            }
+                          }
+                        }
+                        throw revokeError;
+                      }
                     } catch (error) {
                       setDeleting(false);
                       if ((error as { code?: string }).code === 'ERR_REQUEST_CANCELED') return;

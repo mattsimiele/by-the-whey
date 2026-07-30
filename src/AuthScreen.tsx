@@ -124,8 +124,18 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
       if (error) throw error;
       const fullName = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ');
       if (fullName && data.user) {
-        await supabase.auth.updateUser({ data: { display_name: fullName, full_name: fullName } });
-        await supabase.from('profiles').update({ display_name: fullName }).eq('id', data.user.id);
+        const { error: profileNameError } = await supabase
+          .from('profiles')
+          .update({ display_name: fullName })
+          .eq('id', data.user.id);
+        if (profileNameError) throw profileNameError;
+
+        // Updating auth metadata emits USER_UPDATED. Do this after the profile
+        // row is saved so the app reloads the newly supplied Apple name.
+        const { error: metadataNameError } = await supabase.auth.updateUser({
+          data: { display_name: fullName, full_name: fullName },
+        });
+        if (metadataNameError) throw metadataNameError;
       }
     } catch (error) {
       if ((error as { code?: string }).code !== 'ERR_REQUEST_CANCELED') {
