@@ -83,7 +83,8 @@ Never place a service-role key or database password in the mobile app.
 - [x] Server-side text filtering and pre-publication admin review for uploaded photos.
 - [x] Profile and tasting visibility review.
 - [x] Add Apple token revocation during in-app account deletion.
-- [ ] Deploy/configure the Apple revocation Edge Function and verify Sign in with Apple on a physical device.
+- [x] Deploy/configure the Apple revocation Edge Function.
+- [ ] Verify Sign in with Apple and Apple account deletion on a physical device.
 - [x] Add native privacy manifest declarations and clear camera/photo permission descriptions.
 - [ ] Complete App Store Connect privacy disclosures and age-rating questionnaire.
 
