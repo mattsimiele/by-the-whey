@@ -23,8 +23,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import type { Session } from '@supabase/supabase-js';
 import * as ImagePicker from 'expo-image-picker';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { decode } from 'base64-arraybuffer';
 import { AuthScreen } from './src/AuthScreen';
+import { clearAppleUserId, getStoredAppleCredentialState } from './src/appleCredential';
 import { CatalogManagement } from './src/CatalogManagement';
 import { SafetyCenter } from './src/SafetyCenter';
 import { ConnectionsModal, EditProfileModal, ProfileRecord, PublicProfileModal } from './src/ProfileModals';
@@ -1344,6 +1346,38 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [profileReload, setProfileReload] = useState(0);
+  const checkingAppleCredential = useRef(false);
+
+  const validateAppleCredential = async (activeSession: Session | null) => {
+    const appleIdentity = activeSession?.user.identities?.find((identity) => identity.provider === 'apple');
+    if (
+      !supabase
+      || !activeSession
+      || checkingAppleCredential.current
+      || !appleIdentity
+    ) return;
+
+    checkingAppleCredential.current = true;
+    try {
+      const appleUserId = typeof appleIdentity.identity_data?.sub === 'string'
+        ? appleIdentity.identity_data.sub
+        : appleIdentity.id;
+      const credentialState = await getStoredAppleCredentialState(appleUserId);
+      if (
+        credentialState === AppleAuthentication.AppleAuthenticationCredentialState.REVOKED
+        || credentialState === AppleAuthentication.AppleAuthenticationCredentialState.NOT_FOUND
+      ) {
+        await clearAppleUserId();
+        await supabase.auth.signOut();
+        Alert.alert('Apple sign-in expired', 'Your Apple authorization is no longer active. Please sign in again.');
+      }
+    } catch {
+      // Apple credential-state checks are unavailable in the iOS simulator and
+      // can fail transiently. Keep the server-validated Supabase session active.
+    } finally {
+      checkingAppleCredential.current = false;
+    }
+  };
 
   useEffect(() => {
     if (!supabase) {
@@ -1352,6 +1386,7 @@ export default function App() {
     }
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
+      void validateAppleCredential(data.session);
       setLoadingSession(false);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
@@ -1360,11 +1395,20 @@ export default function App() {
       if (!nextSession) {
         setGuest(false);
         setProfile(null);
+        void clearAppleUserId();
       }
+      if (nextSession) void validateAppleCredential(nextSession);
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void validateAppleCredential(session);
+    });
+    return () => subscription.remove();
+  }, [session]);
 
   useEffect(() => {
     if (!supabase) return;

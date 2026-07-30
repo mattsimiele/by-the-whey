@@ -18,6 +18,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Brand, PrimaryButton } from './components';
+import { storeAppleUserId } from './appleCredential';
 import { supabase } from './lib/supabase';
 import { colors, shadow } from './theme';
 
@@ -122,6 +123,7 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
         nonce: rawNonce,
       });
       if (error) throw error;
+      await storeAppleUserId(credential.user);
       const fullName = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ');
       if (fullName && data.user) {
         const { error: profileNameError } = await supabase
