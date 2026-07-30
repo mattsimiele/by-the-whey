@@ -1114,11 +1114,29 @@ function Root({ profile, signedIn, userId, onAccountDeleted, onProfileUpdated }:
   const [focusedPostId, setFocusedPostId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [connectionReload, setConnectionReload] = useState(0);
+  const promptedForProfileName = useRef(false);
   const openNotifications = () => signedIn ? setNotificationsOpen(true) : Alert.alert('Sign in required', 'Create an account to receive community notifications.');
   const refreshCommunity = () => {
     setFeedReload((value) => value + 1);
     setCatalogReload((value) => value + 1);
   };
+
+  useEffect(() => {
+    if (!signedIn) {
+      promptedForProfileName.current = false;
+      return;
+    }
+    if (!profile || profile.display_name !== 'Cheese lover' || promptedForProfileName.current) return;
+    promptedForProfileName.current = true;
+    Alert.alert(
+      'Finish your profile',
+      'Apple only shares your name during its first authorization. Add the name and handle you want other cheese lovers to see.',
+      [
+        { text: 'Later', style: 'cancel' },
+        { text: 'Add my name', onPress: () => setEditProfileOpen(true) },
+      ],
+    );
+  }, [profile, signedIn]);
 
   const openNotificationTarget = async (targetType: string, targetId: string) => {
     if (targetType === 'profile') {
