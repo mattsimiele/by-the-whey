@@ -32,6 +32,16 @@ If Node.js and pnpm are installed globally, `pnpm install` followed by `pnpm sta
 
 Android EAS preview and production profiles, Play listing copy, Data Safety notes, content declarations, tester instructions, artwork, and the release runbook are ready. Start with [`docs/ANDROID_BETA_RELEASE.md`](docs/ANDROID_BETA_RELEASE.md).
 
+## Web catalog management
+
+The authenticated Catalog Studio is published at `https://bythe-whey.com/manage/`. It uses the same Supabase database and Row Level Security policies as the mobile app:
+
+- Approved cheesemongers can browse the published catalog and submit complete new cheese records.
+- Administrators can correct published records, review pending submissions, and approve or reject them.
+- Turophile and unapproved accounts are denied access.
+
+The website uses only the public Supabase publishable key. Never add a service-role key to `docs/` or any browser-delivered file.
+
 ## Store release automation
 
 Run `pnpm release` to build iOS, automatically submit the successful build to TestFlight, and then build the Android App Bundle. The command uses the free-plan-compatible EAS CLI flow and only starts Android after the iOS build and handoff succeed. Production build numbers are incremented remotely by EAS. Android submission remains a separate step until the Google Play service-account key is uploaded to EAS.
@@ -62,7 +72,7 @@ See [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) for the proposed schema and polic
 2. Run `supabase/migrations/202607250001_initial_schema.sql` in its SQL Editor.
 3. Copy `.env.example` to `.env`.
 4. Add the project URL and publishable key from Supabase Project Settings → API.
-5. In Authentication → URL Configuration, set the Site URL to `https://www.thecurdnerd.com/by-the-whey` and add `https://www.thecurdnerd.com/by-the-whey**` plus `bythewhey://**` to the redirect allow list. This keeps confirmation emails off localhost while preserving in-app password recovery.
+5. In Authentication → URL Configuration, set the Site URL to `https://bythe-whey.com/` and add `https://bythe-whey.com/**` plus `bythewhey://**` to the redirect allow list. This supports website authentication, keeps confirmation emails off localhost, and preserves in-app password recovery.
 6. Follow [`docs/GOOGLE_AUTH_SETUP.md`](docs/GOOGLE_AUTH_SETUP.md) to enable Google sign-in for iOS and Android.
 
 Never place a service-role key or database password in the mobile app.
@@ -88,7 +98,7 @@ Never place a service-role key or database password in the mobile app.
 - [x] Add native privacy manifest declarations and clear camera/photo permission descriptions.
 - [ ] Complete App Store Connect privacy disclosures and age-rating questionnaire.
 
-The support contact is `support@thecurdnerd.com`. Privacy, Terms, Guidelines, Support, and Account Deletion are published together at `https://www.thecurdnerd.com/by-the-whey` and also exist in-app. Sign in with Apple must be verified after the Apple Developer enrollment is active. See [`docs/MODERATION.md`](docs/MODERATION.md) for the operational moderation workflow.
+The support contact is `support@thecurdnerd.com`. Privacy, Terms, Guidelines, Support, and Account Deletion are published at `https://bythe-whey.com/` and also exist in-app. See [`docs/MODERATION.md`](docs/MODERATION.md) for the operational moderation workflow.
 
 ### Remaining product polish
 
