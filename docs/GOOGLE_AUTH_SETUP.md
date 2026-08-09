@@ -13,9 +13,9 @@ In Google Cloud Console, open Google Auth Platform for the project that will own
 1. Branding:
    - App name: `By the Whey`
    - User support email: the Google account used for the project
-   - Homepage: `https://www.thecurdnerd.com/by-the-whey`
-   - Privacy policy: `https://www.thecurdnerd.com/by-the-whey`
-   - Terms: `https://www.thecurdnerd.com/by-the-whey`
+   - Homepage: `https://bythe-whey.com/`
+   - Privacy policy: `https://bythe-whey.com/privacy/`
+   - Terms: `https://bythe-whey.com/terms/`
    - Developer contact: `support@thecurdnerd.com`
 2. Audience: choose External. While testing, add every tester's Google email. Publish the app before public release.
 3. Data Access: request only:

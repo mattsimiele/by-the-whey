@@ -21,7 +21,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 
 export function Rating({ value, large = false }: { value: number; large?: boolean }) {
   return (
-    <View style={[styles.rating, large && styles.ratingLarge]}>
+    <View accessible accessibilityRole="text" accessibilityLabel={`${value.toFixed(1)} out of 5 stars`} style={[styles.rating, large && styles.ratingLarge]}>
       <Ionicons name="star" size={large ? 15 : 12} color={colors.gold} />
       <Text style={[styles.ratingText, large && styles.ratingTextLarge]}>{value.toFixed(1)}</Text>
     </View>
@@ -29,9 +29,9 @@ export function Rating({ value, large = false }: { value: number; large?: boolea
 }
 
 export function CheeseArt({ name, color, size = 72, imageUrl }: { name: string; color: string; size?: number; imageUrl?: string }) {
-  if (imageUrl) return <Image source={{ uri: imageUrl }} style={[styles.cheeseArt, { width: size, height: size }]} resizeMode="cover" />;
+  if (imageUrl) return <Image accessible accessibilityLabel={`${name} cheese`} source={{ uri: imageUrl }} style={[styles.cheeseArt, { width: size, height: size }]} resizeMode="cover" />;
   return (
-    <View style={[styles.cheeseArt, { width: size, height: size, backgroundColor: color }]}>
+    <View accessible accessibilityRole="image" accessibilityLabel={`${name} placeholder illustration`} style={[styles.cheeseArt, { width: size, height: size, backgroundColor: color }]}>
       <View style={styles.rindLine} />
       <View style={[styles.hole, { width: size * 0.15, height: size * 0.15, top: size * 0.2, left: size * 0.24 }]} />
       <View style={[styles.hole, { width: size * 0.09, height: size * 0.09, top: size * 0.56, left: size * 0.53 }]} />
@@ -45,7 +45,7 @@ export function SectionHeader({ title, action, onPress }: { title: string; actio
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {action && (
-        <Pressable onPress={onPress}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${action} ${title}`} onPress={onPress}>
           <Text style={styles.sectionAction}>{action}</Text>
         </Pressable>
       )}
@@ -55,7 +55,7 @@ export function SectionHeader({ title, action, onPress }: { title: string; actio
 
 export function PrimaryButton({ label, icon, onPress, secondary = false, disabled = false }: { label: string; icon?: keyof typeof Ionicons.glyphMap; onPress?: () => void; secondary?: boolean; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, secondary && styles.buttonSecondary, disabled && { opacity: 0.45 }, pressed && { opacity: 0.86 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, secondary && styles.buttonSecondary, disabled && { opacity: 0.45 }, pressed && { opacity: 0.86 }]}>
       {icon && <Ionicons name={icon} size={18} color={secondary ? colors.wine : colors.white} />}
       <Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{label}</Text>
     </Pressable>

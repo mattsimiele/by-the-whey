@@ -7,3 +7,4 @@ web-build/
 .DS_Store
 outputs/**/*.png
 outputs/**/*.inspect.ndjson
+store-release-checklist/

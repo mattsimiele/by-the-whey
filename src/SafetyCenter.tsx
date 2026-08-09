@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from './components';
+import { PUBLIC_SITE_URL } from './config';
 import { supabase } from './lib/supabase';
 import { colors } from './theme';
 
@@ -37,11 +38,11 @@ export function SafetyCenter({ visible, userId, onAccountDeleted, onClose }: { v
   };
 
   const openWebsite = async () => {
-    const url = 'https://www.thecurdnerd.com/by-the-whey';
+    const url = PUBLIC_SITE_URL;
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert('Website unavailable', 'Visit thecurdnerd.com/by-the-whey in your browser.');
+      Alert.alert('Website unavailable', 'Visit bythe-whey.com in your browser.');
     }
   };
 
@@ -169,12 +170,12 @@ export function SafetyCenter({ visible, userId, onAccountDeleted, onClose }: { v
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.page}>
         <View style={styles.header}>
-          <Pressable style={styles.close} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close Safety and Legal" style={styles.close} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
           <Text style={styles.title}>Safety & Legal</Text>
           <View style={{ width: 38 }} />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-          {pages.map((item) => <Pressable key={item.id} onPress={() => setPage(item.id)} style={[styles.tab, page === item.id && styles.tabActive]}><Text style={[styles.tabText, page === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>)}
+          {pages.map((item) => <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: page === item.id }} accessibilityLabel={item.label} onPress={() => setPage(item.id)} style={[styles.tab, page === item.id && styles.tabActive]}><Text style={[styles.tabText, page === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>)}
         </ScrollView>
         <ScrollView contentContainerStyle={styles.content}>
           {page === 'safety' && (

@@ -74,7 +74,7 @@ export function EditProfileModal({ visible, profile, onSaved, onClose }: { visib
   return <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}><SafeAreaView style={styles.page}>
     <ModalHeader title="Edit profile" onClose={onClose} />
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Pressable onPress={pickAvatar} style={styles.avatarPicker}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Choose profile photo" onPress={pickAvatar} style={styles.avatarPicker}>
         {avatar?.uri || avatarUrl(profile.avatar_path) ? <Image source={{ uri: avatar?.uri ?? avatarUrl(profile.avatar_path)! }} style={styles.avatarImage} /> : <View style={styles.avatarFallback}><Text style={styles.avatarInitial}>{displayName.charAt(0).toUpperCase()}</Text></View>}
         <View style={styles.camera}><Ionicons name="camera" size={15} color={colors.white} /></View>
       </Pressable>
@@ -175,7 +175,7 @@ export function PublicProfileModal({ profileId, currentUserId, onChanged, onClos
 }
 
 function ModalHeader({ title, onClose }: { title: string; onClose: () => void }) {
-  return <View style={styles.header}><Pressable style={styles.close} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable><Text style={styles.headerTitle}>{title}</Text><View style={{ width: 38 }} /></View>;
+  return <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel={`Close ${title}`} style={styles.close} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable><Text style={styles.headerTitle}>{title}</Text><View style={{ width: 38 }} /></View>;
 }
 
 function Field(props: React.ComponentProps<typeof TextInput> & { label: string }) {

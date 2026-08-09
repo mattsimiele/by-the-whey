@@ -60,7 +60,13 @@ Complete:
 
 Use the verified public legal, privacy, support, and account-deletion page:
 
-`https://www.thecurdnerd.com/by-the-whey`
+Use these verified public pages:
+
+- Website: `https://bythe-whey.com/`
+- Privacy policy: `https://bythe-whey.com/privacy/`
+- Terms: `https://bythe-whey.com/terms/`
+- Support: `https://bythe-whey.com/support/`
+- Account deletion: `https://bythe-whey.com/delete-account/`
 
 ## 7. Testing tracks
 

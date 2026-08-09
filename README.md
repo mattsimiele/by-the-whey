@@ -30,6 +30,14 @@ The script uses the bundled development runtime and installs anything missing au
 
 If Node.js and pnpm are installed globally, `pnpm install` followed by `pnpm start` works as well.
 
+Before creating a release build on this Mac, run:
+
+```bash
+./release-check.command
+```
+
+This uses the bundled Node/pnpm runtime, verifies the lockfile, runs automated release tests and TypeScript checking, and validates identifiers, artwork dimensions, legal links, and required public pages.
+
 ## Android beta release
 
 Android EAS preview and production profiles, Play listing copy, Data Safety notes, content declarations, tester instructions, artwork, and the release runbook are ready. Start with [`docs/ANDROID_BETA_RELEASE.md`](docs/ANDROID_BETA_RELEASE.md).
@@ -106,12 +114,12 @@ Last reviewed against the codebase and live backend on **August 9, 2026**. “Im
 
 ### Release blockers and required verification
 
-- [ ] Replace remaining `https://www.thecurdnerd.com/by-the-whey` links in the mobile signup/legal flows and Android store documents with the corresponding `https://bythe-whey.com/` pages.
-- [ ] Restore a reproducible local dependency install and typecheck. The current checked-out `node_modules` was created by a different pnpm runtime, so this audit could not complete `pnpm typecheck` without pnpm attempting to repair dependencies from the registry.
-- [ ] Make Terms of Use and Privacy Policy tappable during account creation and add an explicit acceptance control or recorded acceptance before a user can upload public content.
+- [x] Replace retired website links in the mobile signup/legal flows and Android release documents with dedicated `https://bythe-whey.com/` pages.
+- [x] Restore a reproducible local dependency install, automated tests, TypeScript check, and one-command release preflight through `./release-check.command`.
+- [x] Make Terms and Privacy tappable during account creation, require explicit acceptance, and record acceptance timestamps in authentication metadata.
 - [ ] Complete the physical multi-account iPhone and Android matrix in [`docs/DEVICE_TEST_MATRIX.md`](docs/DEVICE_TEST_MATRIX.md), especially visibility, moderation, realtime notifications, interrupted uploads, and account deletion.
 - [ ] Verify first and repeat Sign in with Apple, hidden-email accounts, name capture, and Apple token revocation on a physical iPhone/TestFlight build.
-- [ ] Decide whether to support iPad at launch. `supportsTablet` is currently enabled; either test and prepare iPad presentation/screenshots or disable it before the release candidate.
+- [ ] Test iPad before launch. `supportsTablet` remains enabled by product choice, and the required layout pass is listed in [`docs/DEVICE_TEST_MATRIX.md`](docs/DEVICE_TEST_MATRIX.md).
 - [ ] Complete App Store Connect privacy disclosures, the current age-rating questionnaire, content-rights answers, review contact, demo account/instructions, screenshots, description, keywords, and support/marketing/privacy URLs.
 - [ ] Complete Google Play Data Safety, content rating, target audience, ads declaration, app access, store listing, screenshots, privacy URL, and account-deletion URL.
 - [ ] If the Play developer account is a new personal account, complete a closed test with at least 12 continuously opted-in testers for 14 days before applying for production access.
@@ -122,7 +130,7 @@ Last reviewed against the codebase and live backend on **August 9, 2026**. “Im
 ### Important quality work after the first beta
 
 - [ ] Add automated tests for authentication callbacks, role access, tasting mutations, visibility, moderation, and account deletion. There is currently no automated test suite or CI release gate.
-- [ ] Run a dedicated accessibility pass for VoiceOver/TalkBack labels, dynamic text, contrast, focus order, and touch-target size.
+- [ ] Complete the physical accessibility pass in [`docs/ACCESSIBILITY_AUDIT.md`](docs/ACCESSIBILITY_AUDIT.md). The initial code-level labels, roles, states, and major icon-control fixes are implemented.
 - [ ] Add privacy-conscious crash reporting before public launch, then update Apple/Google privacy disclosures if the tool collects diagnostics.
 - [ ] Add true push notifications if testers need alerts while the app is closed; current notifications are realtime only while the app is active.
 - [ ] Add comment editing.
@@ -132,15 +140,23 @@ Last reviewed against the codebase and live backend on **August 9, 2026**. “Im
 
 ### Recommended next sequence
 
-1. Fix the stale domain links and explicit Terms/Privacy acceptance.
-2. Produce one release-candidate build for both platforms.
-3. Run the full three-role, two-device matrix and fix only release-blocking regressions.
-4. Start or continue TestFlight and Google Play closed testing; collect feedback with build number, device, account role, steps, and screenshots.
-5. Complete store disclosures, metadata, screenshots, demo access, and moderation operations while the beta is running.
-6. Submit iOS when the physical Apple deletion test passes; apply for Google production access after its required closed-testing period.
-7. Defer monetization until beta retention and logging behavior are understood. Premium palate insights, producer/retailer profiles, affiliate storefront links, and restrained sponsored discovery fit the product better than an ad-heavy feed.
+1. Run `./release-check.command` and produce one release-candidate build for both platforms.
+2. Run the full three-role, iPhone/Android/iPad matrix and fix only release-blocking regressions.
+3. Start or continue TestFlight and Google Play closed testing; collect feedback with build number, device, account role, steps, and screenshots.
+4. Complete store disclosures, metadata, screenshots, demo access, and moderation operations while the beta is running.
+5. Submit iOS when the physical Apple deletion test passes; apply for Google production access after its required closed-testing period.
+6. Defer monetization until beta retention and logging behavior are understood. Premium palate insights, producer/retailer profiles, affiliate storefront links, and restrained sponsored discovery fit the product better than an ad-heavy feed.
 
 The support contact is `support@thecurdnerd.com`. See [`docs/MODERATION.md`](docs/MODERATION.md) for the operational moderation workflow.
+
+Release support documents:
+
+- [`docs/RELEASE_CANDIDATE_CHECKLIST.md`](docs/RELEASE_CANDIDATE_CHECKLIST.md)
+- [`docs/BETA_FEEDBACK_TEMPLATE.md`](docs/BETA_FEEDBACK_TEMPLATE.md)
+- [`docs/IMAGE_RIGHTS_CHECKLIST.md`](docs/IMAGE_RIGHTS_CHECKLIST.md)
+- [`docs/ACCESSIBILITY_AUDIT.md`](docs/ACCESSIBILITY_AUDIT.md)
+
+The local `store-release-checklist/` directory contains Apple and Google Play field-by-field worksheets. It is intentionally excluded from Git so console notes and reviewer details cannot be committed accidentally.
 
 ## Instagram launch kit
 

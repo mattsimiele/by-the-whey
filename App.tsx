@@ -58,7 +58,7 @@ function AppHeader({ title, subtitle, unreadCount = 0, onNotifications }: { titl
           <Text style={styles.pageTitle}>{title}</Text>
         </View>
       ) : <Brand compact />}
-      <Pressable style={styles.headerAction} onPress={onNotifications}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} style={styles.headerAction} onPress={onNotifications}>
         <Ionicons name="notifications-outline" size={21} color={colors.ink} />
         {unreadCount > 0 && <View style={styles.notificationBadge}><Text style={styles.notificationBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>}
       </Pressable>
@@ -422,7 +422,7 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
         <SafeAreaView style={styles.commentsPage} edges={['top', 'right', 'bottom', 'left']}>
         <KeyboardAvoidingView style={styles.keyboardPage} behavior="height">
           <View style={styles.commentsHeader}>
-            <Pressable style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close comments" style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
             <Text style={styles.commentsTitle}>Tasting conversation</Text>
             <View style={{ width: 38 }} />
           </View>
@@ -440,7 +440,7 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
           </ScrollView>
           <View style={styles.commentComposer}>
             <TextInput value={body} onChangeText={setBody} onFocus={() => setTimeout(() => commentsScrollRef.current?.scrollToEnd({ animated: true }), 200)} placeholder="Add a thoughtful comment…" placeholderTextColor="#9B958A" style={styles.commentInput} multiline />
-            <Pressable onPress={send} disabled={sending || !body.trim()} style={styles.commentSend}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Send comment" accessibilityState={{ disabled: sending || !body.trim() }} onPress={send} disabled={sending || !body.trim()} style={styles.commentSend}>
               {sending ? <ActivityIndicator size="small" color={colors.white} /> : <Ionicons name="arrow-up" size={20} color={colors.white} />}
             </Pressable>
           </View>
@@ -662,7 +662,7 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
           <Text style={styles.ratingNumber}>{rating.toFixed(1)}</Text>
           <View style={styles.stars}>
             {[1, 2, 3, 4, 5].map((star) => (
-              <Pressable key={star} onPress={(event) => setRating(star - (event.nativeEvent.locationX < 17 ? 0.5 : 0))}>
+            <Pressable key={star} accessibilityRole="adjustable" accessibilityLabel={`Set rating near ${star} stars`} onPress={(event) => setRating(star - (event.nativeEvent.locationX < 17 ? 0.5 : 0))}>
                 <Ionicons name={rating >= star ? 'star' : rating >= star - 0.5 ? 'star-half' : 'star-outline'} size={34} color={colors.gold} />
               </Pressable>
             ))}
@@ -939,9 +939,9 @@ function CheeseModal({ cheese, userId, onSavedChange, onTastingUpdated, onLog, o
       <SafeAreaView style={styles.modalSafe}>
         <ScrollView contentContainerStyle={styles.detailContent}>
           <View style={styles.modalHeader}>
-            <Pressable style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close cheese details" style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
             <Brand compact />
-            <Pressable style={styles.modalButton} disabled={savingBookmark} onPress={toggleSaved}>
+            <Pressable accessibilityRole="button" accessibilityLabel={saved ? 'Remove from saved cheeses' : 'Save cheese for later'} accessibilityState={{ disabled: savingBookmark }} style={styles.modalButton} disabled={savingBookmark} onPress={toggleSaved}>
               {savingBookmark ? <ActivityIndicator size="small" color={colors.wine} /> : <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={21} color={colors.wine} />}
             </Pressable>
           </View>
@@ -1043,7 +1043,7 @@ function NotificationsModal({ visible, userId, onChanged, onOpenTarget, onClose 
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.commentsPage}>
         <View style={styles.commentsHeader}>
-          <Pressable style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close notifications" style={styles.modalButton} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
           <Text style={styles.commentsTitle}>Notifications</Text>
           <Pressable onPress={markAllRead}><Text style={styles.markRead}>Read all</Text></Pressable>
         </View>
@@ -1319,7 +1319,7 @@ function Root({ profile, signedIn, userId, onAccountDeleted, onProfileUpdated }:
           const active = tab === item.id;
           const isLog = item.id === 'log';
           return (
-            <Pressable key={item.id} onPress={() => { if (item.id === 'log') setLogCheese(null); setTab(item.id); }} style={styles.tabItem}>
+            <Pressable key={item.id} accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{ selected: active }} onPress={() => { if (item.id === 'log') setLogCheese(null); setTab(item.id); }} style={styles.tabItem}>
               <View style={isLog ? styles.logButton : undefined}>
                 <Ionicons name={active ? item.active : item.icon} size={isLog ? 27 : 22} color={isLog ? colors.white : active ? colors.wine : colors.muted} />
               </View>

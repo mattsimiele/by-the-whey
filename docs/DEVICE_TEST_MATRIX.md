@@ -8,6 +8,8 @@ Run this matrix with at least three non-production accounts:
 
 Use one physical iPhone and one physical Android phone. Repeat the critical rows on a second account/device simultaneously where noted.
 
+Because `supportsTablet` remains enabled, also complete the iPad layout section before submitting the release candidate.
+
 | Area | iPhone | Android | Accounts | Expected result |
 | --- | --- | --- | --- | --- |
 | Email signup, verification, sign-in, sign-out | Required | Required | taster | One profile is created and the session survives relaunch |
@@ -39,3 +41,12 @@ Test each of these once on iPhone and Android:
 5. After reconnection, confirm no duplicate tasting, comment, follow, or photo record was created.
 
 Record device model, OS version, build number, account role, pass/fail, and a screenshot for each failure.
+
+## iPad layout pass
+
+- [ ] Authentication and legal-acceptance controls remain readable in portrait and landscape.
+- [ ] Feed cards, Discover, Log, Cellar, Profile, and cheese details do not become excessively wide or clipped.
+- [ ] Comments, notifications, Safety & Legal, profile editing, and catalog management respect safe areas and can be dismissed.
+- [ ] The software keyboard does not cover active fields in tasting, comment, profile, or catalog forms.
+- [ ] Images retain their intended aspect ratios without low-resolution stretching.
+- [ ] Tab bar, modal controls, and text remain comfortably reachable and legible.

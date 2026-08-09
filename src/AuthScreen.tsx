@@ -19,6 +19,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Brand, PrimaryButton } from './components';
 import { storeAppleUserId } from './appleCredential';
+import { EMAIL_CONFIRMATION_URL, PRIVACY_URL, TERMS_URL } from './config';
+import { createLegalAcceptanceMetadata, normalizeHandle, parseAuthCallbackUrl } from './lib/coreTransforms';
 import { supabase } from './lib/supabase';
 import { colors, shadow } from './theme';
 
@@ -33,14 +35,36 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const appleSignInAvailable = Platform.OS === 'ios';
+
+  const requireLegalAcceptance = () => {
+    if (mode !== 'signUp' || legalAccepted) return true;
+    Alert.alert('Review and accept', 'Accept the Terms of Use and Privacy Policy before creating an account.');
+    return false;
+  };
+
+  const recordSocialAcceptance = async () => {
+    if (mode !== 'signUp') return;
+    const { error } = await supabase!.auth.updateUser({ data: createLegalAcceptanceMetadata() });
+    if (error) throw error;
+  };
+
+  const openLegalPage = async (url: string, label: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert(`${label} unavailable`, `Visit ${url} in your browser.`);
+    }
+  };
 
   const submit = async () => {
     if (!supabase) {
       Alert.alert('Configuration missing', 'Supabase has not been connected yet.');
       return;
     }
+    if (!requireLegalAcceptance()) return;
     if (!email.trim() || password.length < 8) {
       Alert.alert('Check your details', 'Enter a valid email and a password of at least 8 characters.');
       return;
@@ -57,10 +81,11 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
           email: email.trim().toLowerCase(),
           password,
           options: {
-            emailRedirectTo: 'https://www.thecurdnerd.com/by-the-whey?auth=confirmed',
+            emailRedirectTo: EMAIL_CONFIRMATION_URL,
             data: {
               display_name: displayName.trim(),
               handle: handle.trim().toLowerCase(),
+              ...createLegalAcceptanceMetadata(),
             },
           },
         });
@@ -102,6 +127,7 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
 
   const signInWithApple = async () => {
     if (!supabase) return;
+    if (!requireLegalAcceptance()) return;
     setBusy(true);
     try {
       const rawNonce = Crypto.randomUUID();
@@ -123,6 +149,7 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
         nonce: rawNonce,
       });
       if (error) throw error;
+      await recordSocialAcceptance();
       await storeAppleUserId(credential.user);
       const fullName = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ');
       if (fullName && data.user) {
@@ -150,6 +177,7 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
 
   const signInWithGoogle = async () => {
     if (!supabase) return;
+    if (!requireLegalAcceptance()) return;
     setBusy(true);
     try {
       const redirectTo = Linking.createURL('auth/callback');
@@ -166,28 +194,26 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
       if (result.type !== 'success') return;
 
-      const parameterText = result.url.includes('#')
-        ? result.url.split('#')[1]
-        : result.url.split('?')[1] ?? '';
-      const parameters = new URLSearchParams(parameterText);
-      const callbackError = parameters.get('error_description') ?? parameters.get('error');
-      if (callbackError) throw new Error(decodeURIComponent(callbackError.replace(/\+/g, ' ')));
+      const callback = parseAuthCallbackUrl(result.url);
+      if (callback.error) throw new Error(callback.error);
 
-      const code = parameters.get('code');
+      const code = callback.code;
       if (code) {
         const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeError) throw exchangeError;
+        await recordSocialAcceptance();
         return;
       }
 
-      const accessToken = parameters.get('access_token');
-      const refreshToken = parameters.get('refresh_token');
+      const accessToken = callback.accessToken;
+      const refreshToken = callback.refreshToken;
       if (!accessToken || !refreshToken) throw new Error('Google sign-in did not return a valid session.');
       const { error: sessionError } = await supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken,
       });
       if (sessionError) throw sessionError;
+      await recordSocialAcceptance();
     } catch (error) {
       Alert.alert('Google Sign-In failed', error instanceof Error ? error.message : 'Please try again.');
     } finally {
@@ -216,10 +242,10 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
 
         <View style={styles.card}>
           <View style={styles.modePicker}>
-            <Pressable onPress={() => setMode('signUp')} style={[styles.mode, mode === 'signUp' && styles.modeActive]}>
+            <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === 'signUp' }} onPress={() => setMode('signUp')} style={[styles.mode, mode === 'signUp' && styles.modeActive]}>
               <Text style={[styles.modeText, mode === 'signUp' && styles.modeTextActive]}>Create account</Text>
             </Pressable>
-            <Pressable onPress={() => setMode('signIn')} style={[styles.mode, mode === 'signIn' && styles.modeActive]}>
+            <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === 'signIn' }} onPress={() => setMode('signIn')} style={[styles.mode, mode === 'signIn' && styles.modeActive]}>
               <Text style={[styles.modeText, mode === 'signIn' && styles.modeTextActive]}>Sign in</Text>
             </Pressable>
           </View>
@@ -227,22 +253,44 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
           {mode === 'signUp' && (
             <>
               <Text style={styles.label}>NAME</Text>
-              <TextInput value={displayName} onChangeText={setDisplayName} placeholder="How should we know you?" placeholderTextColor="#9B958A" style={styles.input} autoCapitalize="words" />
+              <TextInput accessibilityLabel="Display name" value={displayName} onChangeText={setDisplayName} placeholder="How should we know you?" placeholderTextColor="#9B958A" style={styles.input} autoCapitalize="words" />
               <Text style={styles.label}>HANDLE</Text>
               <View style={styles.inputRow}>
                 <Text style={styles.prefix}>@</Text>
-                <TextInput value={handle} onChangeText={(value) => setHandle(value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="curd_lover" placeholderTextColor="#9B958A" style={styles.rowInput} autoCapitalize="none" />
+                <TextInput accessibilityLabel="Handle" value={handle} onChangeText={(value) => setHandle(normalizeHandle(value))} placeholder="curd_lover" placeholderTextColor="#9B958A" style={styles.rowInput} autoCapitalize="none" />
               </View>
             </>
           )}
 
           <Text style={styles.label}>EMAIL</Text>
-          <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#9B958A" style={styles.input} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
+          <TextInput accessibilityLabel="Email address" value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#9B958A" style={styles.input} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
           <Text style={styles.label}>PASSWORD</Text>
           <View style={styles.inputRow}>
-            <TextInput value={password} onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor="#9B958A" style={styles.rowInput} secureTextEntry={!showPassword} autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} />
-            <Pressable onPress={() => setShowPassword(!showPassword)}><Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.muted} /></Pressable>
+            <TextInput accessibilityLabel="Password" value={password} onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor="#9B958A" style={styles.rowInput} secureTextEntry={!showPassword} autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} />
+            <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} hitSlop={10} onPress={() => setShowPassword(!showPassword)}><Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.muted} /></Pressable>
           </View>
+
+          {mode === 'signUp' && (
+            <View style={styles.legalBlock}>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: legalAccepted }}
+                accessibilityLabel="Accept the Terms of Use and Privacy Policy"
+                onPress={() => setLegalAccepted((current) => !current)}
+                style={styles.legalCheckRow}
+              >
+                <View style={[styles.checkbox, legalAccepted && styles.checkboxChecked]}>
+                  {legalAccepted && <Ionicons name="checkmark" size={15} color={colors.white} />}
+                </View>
+                <Text style={styles.legalCopy}>I agree to the policies below and the Community Guidelines.</Text>
+              </Pressable>
+              <View style={styles.legalLinks}>
+                <Pressable accessibilityRole="link" onPress={() => openLegalPage(TERMS_URL, 'Terms of Use')}><Text style={styles.legalLink}>Terms of Use</Text></Pressable>
+                <Text style={styles.legalSeparator}>·</Text>
+                <Pressable accessibilityRole="link" onPress={() => openLegalPage(PRIVACY_URL, 'Privacy Policy')}><Text style={styles.legalLink}>Privacy Policy</Text></Pressable>
+              </View>
+            </View>
+          )}
 
           <View style={styles.submit}>
             {busy ? <View style={styles.loading}><ActivityIndicator color={colors.wine} /></View> : (
@@ -272,10 +320,10 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
               />
             </>
           )}
-          <Text style={styles.terms}>By continuing, you agree to our Terms of Use and Privacy Policy.</Text>
+          {mode === 'signIn' && <View style={styles.legalLinks}><Pressable accessibilityRole="link" onPress={() => openLegalPage(TERMS_URL, 'Terms of Use')}><Text style={styles.legalLink}>Terms</Text></Pressable><Text style={styles.legalSeparator}>·</Text><Pressable accessibilityRole="link" onPress={() => openLegalPage(PRIVACY_URL, 'Privacy Policy')}><Text style={styles.legalLink}>Privacy</Text></Pressable></View>}
         </View>
 
-        <Pressable onPress={onGuest} style={styles.guest}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Explore as a guest" onPress={onGuest} style={styles.guest}>
           <Text style={styles.guestText}>Explore as a guest</Text>
           <Ionicons name="arrow-forward" size={15} color={colors.wine} />
         </Pressable>
@@ -307,7 +355,14 @@ const styles = StyleSheet.create({
   rowInput: { flex: 1, color: colors.ink, fontSize: 13 },
   submit: { marginTop: 20 },
   loading: { height: 52, alignItems: 'center', justifyContent: 'center' },
-  terms: { color: colors.muted, fontSize: 8, lineHeight: 13, textAlign: 'center', marginTop: 12 },
+  legalBlock: { marginTop: 16, padding: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 14, backgroundColor: colors.cream },
+  legalCheckRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkbox: { width: 23, height: 23, borderRadius: 6, borderWidth: 1.5, borderColor: colors.muted, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
+  checkboxChecked: { borderColor: colors.wine, backgroundColor: colors.wine },
+  legalCopy: { flex: 1, color: colors.ink, fontSize: 10, lineHeight: 15, fontWeight: '600' },
+  legalLinks: { minHeight: 36, marginTop: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  legalLink: { color: colors.wine, fontSize: 10, fontWeight: '800', textDecorationLine: 'underline' },
+  legalSeparator: { color: colors.muted, fontSize: 10 },
   forgot: { alignSelf: 'center', padding: 10 },
   forgotText: { color: colors.wine, fontSize: 11, fontWeight: '800' },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 },

@@ -9,9 +9,11 @@
     "android": "expo start --android",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "release": "eas build --platform ios --profile production --auto-submit --wait && eas build --platform android --profile production --wait",
-    "release:ios": "eas build --platform ios --profile production --auto-submit",
-    "release:android": "eas build --platform android --profile production"
+    "test": "node --test tests/*.test.mjs",
+    "release:preflight": "pnpm test && pnpm typecheck && node scripts/release-preflight.mjs",
+    "release": "pnpm release:preflight && eas build --platform ios --profile production --auto-submit --wait && eas build --platform android --profile production --wait",
+    "release:ios": "pnpm release:preflight && eas build --platform ios --profile production --auto-submit",
+    "release:android": "pnpm release:preflight && eas build --platform android --profile production"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

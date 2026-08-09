@@ -41,14 +41,16 @@ Cheese, food journal, tasting notes, food community, pairings
 ## Contact
 
 - Email: support@thecurdnerd.com
-- Website: https://www.thecurdnerd.com
-- Privacy: https://www.thecurdnerd.com/by-the-whey
-- Account deletion: https://www.thecurdnerd.com/by-the-whey
+- Website: https://bythe-whey.com/
+- Privacy: https://bythe-whey.com/privacy/
+- Terms: https://bythe-whey.com/terms/
+- Support: https://bythe-whey.com/support/
+- Account deletion: https://bythe-whey.com/delete-account/
 
 ## Release name
 
-0.1.0 — Closed beta
+0.3.0 — Closed beta
 
 ## Release notes
 
-Welcome to the first By the Whey closed beta. Test cheese discovery, tasting logs, photos, profiles, social features, moderation tools, and offline recovery. Please report confusing behavior, missing information, and anything that prevents you from completing a tasting.
+Discover a detailed cheese catalog, log half-star tastings, add notes, locations and photos, build your Cellar, follow fellow cheese lovers, and help us sharpen the beta. Please report confusing behavior, missing information, and anything that prevents you from completing a tasting.

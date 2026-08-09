@@ -8,6 +8,7 @@ import { PrimaryButton } from './components';
 import { Role } from './data';
 import { supabase } from './lib/supabase';
 import { colors } from './theme';
+import { catalogSlug, splitCatalogList } from './lib/coreTransforms';
 
 type Draft = {
   name: string;
@@ -142,12 +143,12 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     const missing = Object.entries(draft).find(([, value]) => !value.trim());
     if (missing) return Alert.alert('Complete every field', 'Published cheese records require all catalog information.');
     setSaving(true);
-    const slug = draft.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const slug = catalogSlug(draft.name);
     const payload = {
       ...draft,
       slug,
-      flavor_profile: draft.flavor_profile.split(',').map((item) => item.trim()).filter(Boolean),
-      pairings: draft.pairings.split(',').map((item) => item.trim()).filter(Boolean),
+      flavor_profile: splitCatalogList(draft.flavor_profile),
+      pairings: splitCatalogList(draft.pairings),
       status: role === 'admin' && editingCheeseId ? 'published' : 'pending',
       submitted_by: userId,
       approved_by: role === 'admin' && editingCheeseId ? userId : null,
@@ -361,7 +362,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.page}>
         <View style={styles.header}>
-          <Pressable style={styles.close} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close catalog management" style={styles.close} onPress={onClose}><Ionicons name="close" size={22} color={colors.ink} /></Pressable>
           <View><Text style={styles.kicker}>CURD NERD CATALOG</Text><Text style={styles.title}>{role === 'admin' ? 'Catalog management' : 'Submit a cheese'}</Text></View>
           <View style={{ width: 38 }} />
         </View>
@@ -372,7 +373,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
             style={styles.tabsScroller}
             contentContainerStyle={styles.tabs}
           >
-            {(['review', 'catalog', 'photos', 'reports', 'submit', 'users'] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item === 'review' ? `Review ${submissions.length}` : item === 'catalog' ? 'Edit catalog' : item === 'photos' ? `Photos ${photos.length}` : item === 'reports' ? `Reports ${reports.length}` : item === 'submit' ? 'Add' : 'Users'}</Text></Pressable>)}
+            {(['review', 'catalog', 'photos', 'reports', 'submit', 'users'] as const).map((item) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: tab === item }} accessibilityLabel={item === 'review' ? `Review queue, ${submissions.length} items` : item === 'catalog' ? 'Edit catalog' : item === 'photos' ? `Photos, ${photos.length} items` : item === 'reports' ? `Reports, ${reports.length} items` : item === 'submit' ? 'Add cheese' : 'Users'} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item === 'review' ? `Review ${submissions.length}` : item === 'catalog' ? 'Edit catalog' : item === 'photos' ? `Photos ${photos.length}` : item === 'reports' ? `Reports ${reports.length}` : item === 'submit' ? 'Add' : 'Users'}</Text></Pressable>)}
           </ScrollView>
         )}
         <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
