@@ -383,7 +383,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
             {fields.map((field) => (
               <View key={field.key}>
                 <Text style={styles.label}>{field.label.toUpperCase()}</Text>
-                <TextInput value={draft[field.key]} onChangeText={(value) => setField(field.key, value)} placeholder={field.placeholder} placeholderTextColor="#9B958A" multiline={field.multiline} style={[styles.input, field.multiline && styles.multiline]} />
+                <TextInput value={draft[field.key]} onChangeText={(value) => setField(field.key, value)} placeholder={field.placeholder} placeholderTextColor={colors.placeholder} multiline={field.multiline} style={[styles.input, field.multiline && styles.multiline]} />
               </View>
             ))}
             <Text style={styles.label}>CATALOG PHOTO</Text>
@@ -395,7 +395,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
         ) : tab === 'catalog' ? (
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} automaticallyAdjustKeyboardInsets>
             <Text style={styles.helper}>Search the published catalog and open any cheese to correct its information.</Text>
-            <TextInput value={catalogEditSearch} onChangeText={setCatalogEditSearch} placeholder="Search cheese or creamery…" placeholderTextColor="#9B958A" style={styles.input} />
+            <TextInput value={catalogEditSearch} onChangeText={setCatalogEditSearch} placeholder="Search cheese or creamery…" placeholderTextColor={colors.placeholder} style={styles.input} />
             {catalogCheeses
               .filter((item) => !catalogEditSearch.trim() || `${item.name} ${item.creamery_name}`.toLowerCase().includes(catalogEditSearch.trim().toLowerCase()))
               .slice(0, 40)
@@ -427,7 +427,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
         ) : tab === 'photos' ? (
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} automaticallyAdjustKeyboardInsets>
             <Text style={styles.queueHeading}>Add to existing catalog</Text>
-            <TextInput value={catalogPhotoSearch} onChangeText={setCatalogPhotoSearch} placeholder="Search cheeses…" placeholderTextColor="#9B958A" style={styles.input} />
+            <TextInput value={catalogPhotoSearch} onChangeText={setCatalogPhotoSearch} placeholder="Search cheeses…" placeholderTextColor={colors.placeholder} style={styles.input} />
             {catalogPhotoSearch.trim().length > 1 && catalogCheeses.filter((item) => `${item.name} ${item.creamery_name}`.toLowerCase().includes(catalogPhotoSearch.trim().toLowerCase())).slice(0, 8).map((item) => (
               <View key={item.id} style={styles.catalogPhotoRow}>
                 <View style={{ flex: 1 }}><Text style={styles.accountName}>{item.name}</Text><Text style={styles.submitter}>{item.creamery_name}</Text></View>

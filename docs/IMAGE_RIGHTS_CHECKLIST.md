@@ -36,6 +36,7 @@ Real producer or retailer photography should not be copied merely because it is 
 | --- | --- | --- |
 | `assets/icon.png` | Artist-supplied iOS/Android app icon source | Confirm the artist agreement permits app-store, website, social, and promotional use |
 | `assets/by-the-whey-character.png` | Artist-supplied transparent in-app brand character and splash artwork | Confirm the artist agreement permits app-store, website, social, and promotional use |
+| `assets/by-the-whey-adaptive.png` | Padded Android adaptive-icon derivative of the artist-supplied character | Covered by the same artist permission as the source character artwork |
 | `docs/assets/by-the-whey-icon.png` | Artist-supplied public website icon and social preview | Confirm the artist agreement permits website/social/store use |
 | `docs/assets/by-the-whey-character.png` | Artist-supplied public website wordmark character | Confirm the artist agreement permits website/social/store use |
 | `store/android/assets/feature-graphic.png` | Google Play feature graphic | Dimensions pass; re-export or approve after the final icon is supplied and record the source assets |

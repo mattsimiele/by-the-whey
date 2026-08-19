@@ -253,7 +253,7 @@ function FeedScreen({ openCheese, openProfile, catalog, feedPosts, profile, user
         </View>
         <View style={styles.peopleSearch}>
           <Ionicons name="people-outline" size={19} color={colors.muted} />
-          <TextInput value={peopleQuery} onChangeText={setPeopleQuery} placeholder="Find people by name or @handle" placeholderTextColor="#9B958A" style={styles.searchInput} autoCapitalize="none" />
+          <TextInput value={peopleQuery} onChangeText={setPeopleQuery} placeholder="Find people by name or @handle" placeholderTextColor={colors.placeholder} style={styles.searchInput} autoCapitalize="none" />
           {searchingPeople ? <ActivityIndicator size="small" color={colors.wine} /> : peopleQuery ? <Pressable onPress={() => setPeopleQuery('')}><Ionicons name="close-circle" size={20} color={colors.muted} /></Pressable> : null}
         </View>
         {peopleQuery.trim().length >= 2 && (
@@ -439,7 +439,7 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
             )) : <Text style={styles.emptyComments}>Start the conversation about this tasting.</Text>}
           </ScrollView>
           <View style={styles.commentComposer}>
-            <TextInput value={body} onChangeText={setBody} onFocus={() => setTimeout(() => commentsScrollRef.current?.scrollToEnd({ animated: true }), 200)} placeholder="Add a thoughtful comment…" placeholderTextColor="#9B958A" style={styles.commentInput} multiline />
+            <TextInput value={body} onChangeText={setBody} onFocus={() => setTimeout(() => commentsScrollRef.current?.scrollToEnd({ animated: true }), 200)} placeholder="Add a thoughtful comment…" placeholderTextColor={colors.placeholder} style={styles.commentInput} multiline />
             <Pressable accessibilityRole="button" accessibilityLabel="Send comment" accessibilityState={{ disabled: sending || !body.trim() }} onPress={send} disabled={sending || !body.trim()} style={styles.commentSend}>
               {sending ? <ActivityIndicator size="small" color={colors.white} /> : <Ionicons name="arrow-up" size={20} color={colors.white} />}
             </Pressable>
@@ -467,7 +467,7 @@ function DiscoverScreen({ openCheese, catalog, loading, error, unreadCount, onRe
       <AppHeader title="Discover" subtitle="FIND YOUR NEXT FAVORITE" unreadCount={unreadCount} onNotifications={onNotifications} />
       <View style={styles.searchBox}>
         <Ionicons name="search" size={20} color={colors.muted} />
-        <TextInput value={query} onChangeText={setQuery} placeholder="Cheese, maker, region…" placeholderTextColor="#9B958A" style={styles.searchInput} />
+        <TextInput value={query} onChangeText={setQuery} placeholder="Cheese, maker, region…" placeholderTextColor={colors.placeholder} style={styles.searchInput} />
         {query ? <Pressable onPress={() => setQuery('')}><Ionicons name="close-circle" size={21} color={colors.muted} /></Pressable> : null}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
@@ -638,7 +638,7 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
           </Pressable>
         ) : <View style={styles.searchBox}>
           <Ionicons name="search" size={20} color={colors.muted} />
-          <TextInput autoFocus={pickerOpen} value={cheeseQuery} onFocus={() => setPickerOpen(true)} onChangeText={setCheeseQuery} placeholder="Search cheese, maker, or category…" placeholderTextColor="#9B958A" style={styles.searchInput} />
+          <TextInput autoFocus={pickerOpen} value={cheeseQuery} onFocus={() => setPickerOpen(true)} onChangeText={setCheeseQuery} placeholder="Search cheese, maker, or category…" placeholderTextColor={colors.placeholder} style={styles.searchInput} />
           {cheeseQuery ? <Pressable onPress={() => setCheeseQuery('')}><Ionicons name="close-circle" size={21} color={colors.muted} /></Pressable> : null}
         </View>}
         {pickerOpen && (
@@ -678,7 +678,7 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
           onFocus={() => revealField(notePosition)}
           multiline
           placeholder="What did you notice? Texture, aroma, flavor, pairing…"
-          placeholderTextColor="#9B958A"
+          placeholderTextColor={colors.placeholder}
           style={styles.noteInput}
         />
         <View style={styles.quickNotes}>
@@ -693,7 +693,7 @@ function LogScreen({ onComplete, catalog, initialCheese, userId, unreadCount, on
           </Pressable>
           <View style={styles.locationEditor} onLayout={(event) => { locationPosition.current = event.nativeEvent.layout.y; }}>
             <Ionicons name="location-outline" size={21} color={colors.wine} />
-            <TextInput value={locationName} onChangeText={setLocationName} onFocus={() => revealField(locationPosition)} placeholder="Where did you taste it? (optional)" placeholderTextColor="#9B958A" style={styles.locationInput} />
+            <TextInput value={locationName} onChangeText={setLocationName} onFocus={() => revealField(locationPosition)} placeholder="Where did you taste it? (optional)" placeholderTextColor={colors.placeholder} style={styles.locationInput} />
           </View>
           <Pressable style={styles.addOn} onPress={() => setIsPublic(!isPublic)}>
             <Ionicons name={isPublic ? 'people-outline' : 'lock-closed-outline'} size={21} color={colors.wine} />
@@ -1084,8 +1084,8 @@ function PasswordResetModal({ visible, onClose }: { visible: boolean; onClose: (
         <View style={styles.resetIcon}><Ionicons name="key-outline" size={30} color={colors.wine} /></View>
         <Text style={styles.resetTitle}>Choose a new password</Text>
         <Text style={styles.resetCopy}>Use at least eight characters. A longer, unique password is best.</Text>
-        <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="New password" placeholderTextColor="#9B958A" style={styles.resetInput} />
-        <TextInput value={confirm} onChangeText={setConfirm} secureTextEntry placeholder="Confirm password" placeholderTextColor="#9B958A" style={styles.resetInput} />
+        <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="New password" placeholderTextColor={colors.placeholder} style={styles.resetInput} />
+        <TextInput value={confirm} onChangeText={setConfirm} secureTextEntry placeholder="Confirm password" placeholderTextColor={colors.placeholder} style={styles.resetInput} />
         {saving ? <ActivityIndicator color={colors.wine} /> : <PrimaryButton label="Update password" icon="checkmark-circle-outline" onPress={update} />}
       </SafeAreaView>
     </Modal>
@@ -1536,9 +1536,9 @@ const styles = StyleSheet.create({
   followButton: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.blush, borderRadius: 12 },
   followText: { color: colors.wine, fontSize: 9, fontWeight: '800' },
   postMenu: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  featureArt: { height: 215, backgroundColor: '#E9DFC9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  featureArt: { height: 215, backgroundColor: colors.lens, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   postPhoto: { width: '100%', height: '100%', resizeMode: 'cover' },
-  pendingPhotoBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(75,30,42,0.9)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  pendingPhotoBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: colors.wineDark, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 5 },
   pendingPhotoText: { color: colors.white, fontSize: 8, fontWeight: '800' },
   artGlow: { position: 'absolute', width: 270, height: 270, borderRadius: 150, backgroundColor: 'rgba(255,255,255,0.30)', top: -75, right: -20 },
   postBody: { padding: 16 },
@@ -1546,7 +1546,7 @@ const styles = StyleSheet.create({
   postCheeseInfo: { flex: 1, minWidth: 0 },
   postCheese: { fontSize: 18, fontWeight: '800', color: colors.ink },
   postMaker: { color: colors.muted, fontSize: 10, marginTop: 3 },
-  postNote: { color: '#4D4942', fontSize: 13, lineHeight: 20, marginTop: 13 },
+  postNote: { color: colors.ink, fontSize: 13, lineHeight: 20, marginTop: 13 },
   locationRow: { flexDirection: 'row', gap: 4, alignItems: 'center', marginTop: 12 },
   locationText: { color: colors.muted, fontSize: 10 },
   socialRow: { borderTopWidth: 1, borderTopColor: colors.line, marginTop: 14, paddingTop: 13, flexDirection: 'row', alignItems: 'center', gap: 22 },
@@ -1599,9 +1599,9 @@ const styles = StyleSheet.create({
   sortTextActive: { color: colors.wine },
   discoveryLabel: { color: colors.wine, fontSize: 9, letterSpacing: 1.5, fontWeight: '900', marginTop: 5, marginBottom: 10 },
   featuredCard: { minHeight: 220, backgroundColor: colors.wineDark, borderRadius: 22, padding: 20, marginBottom: 27, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
-  featuredKicker: { color: '#E6C981', fontSize: 8, letterSpacing: 1.5, fontWeight: '900' },
+  featuredKicker: { color: colors.gold, fontSize: 8, letterSpacing: 1.5, fontWeight: '900' },
   featuredTitle: { color: colors.white, fontSize: 29, lineHeight: 31, fontWeight: '800', marginTop: 9, letterSpacing: -0.7 },
-  featuredCopy: { color: '#E7D9DB', fontSize: 11, lineHeight: 16, width: 165, marginTop: 9 },
+  featuredCopy: { color: colors.lens, fontSize: 11, lineHeight: 16, width: 165, marginTop: 9 },
   featuredLink: { color: colors.white, fontWeight: '800', fontSize: 11, marginTop: 15 },
   cheeseList: { gap: 10, marginBottom: 18 },
   cheeseRow: { minHeight: 94, flexDirection: 'row', alignItems: 'center', gap: 13, padding: 12, backgroundColor: colors.white, borderRadius: 18, borderWidth: 1, borderColor: colors.line },
@@ -1643,7 +1643,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', textAlign: 'center', marginTop: 9 },
   emptyStateCopy: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 5 },
   summaryNumber: { color: colors.white, textAlign: 'center', fontSize: 25, fontWeight: '800' },
-  summaryLabel: { color: '#E6C9D1', marginTop: 3, fontSize: 8, letterSpacing: 1.2, fontWeight: '800' },
+  summaryLabel: { color: colors.lens, marginTop: 3, fontSize: 8, letterSpacing: 1.2, fontWeight: '800' },
   summaryDivider: { width: 1, height: 31, backgroundColor: 'rgba(255,255,255,0.25)' },
   segment: { height: 44, borderRadius: 15, padding: 4, marginVertical: 20, backgroundColor: colors.cream, flexDirection: 'row' },
   segmentItem: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },

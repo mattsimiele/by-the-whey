@@ -1,6 +1,7 @@
 export const colors = {
   ink: '#2B160B',
   muted: '#77665A',
+  placeholder: '#826C5E',
   cream: '#FFF3E8',
   paper: '#FFFBF6',
   wine: '#8F431D',

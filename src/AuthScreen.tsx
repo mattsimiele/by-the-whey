@@ -252,20 +252,20 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
           {mode === 'signUp' && (
             <>
               <Text style={styles.label}>NAME</Text>
-              <TextInput accessibilityLabel="Display name" value={displayName} onChangeText={setDisplayName} placeholder="How should we know you?" placeholderTextColor="#9B958A" style={styles.input} autoCapitalize="words" />
+              <TextInput accessibilityLabel="Display name" value={displayName} onChangeText={setDisplayName} placeholder="How should we know you?" placeholderTextColor={colors.placeholder} style={styles.input} autoCapitalize="words" />
               <Text style={styles.label}>HANDLE</Text>
               <View style={styles.inputRow}>
                 <Text style={styles.prefix}>@</Text>
-                <TextInput accessibilityLabel="Handle" value={handle} onChangeText={(value) => setHandle(normalizeHandle(value))} placeholder="curd_lover" placeholderTextColor="#9B958A" style={styles.rowInput} autoCapitalize="none" />
+                <TextInput accessibilityLabel="Handle" value={handle} onChangeText={(value) => setHandle(normalizeHandle(value))} placeholder="curd_lover" placeholderTextColor={colors.placeholder} style={styles.rowInput} autoCapitalize="none" />
               </View>
             </>
           )}
 
           <Text style={styles.label}>EMAIL</Text>
-          <TextInput accessibilityLabel="Email address" value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#9B958A" style={styles.input} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
+          <TextInput accessibilityLabel="Email address" value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={colors.placeholder} style={styles.input} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
           <Text style={styles.label}>PASSWORD</Text>
           <View style={styles.inputRow}>
-            <TextInput accessibilityLabel="Password" value={password} onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor="#9B958A" style={styles.rowInput} secureTextEntry={!showPassword} autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} />
+            <TextInput accessibilityLabel="Password" value={password} onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor={colors.placeholder} style={styles.rowInput} secureTextEntry={!showPassword} autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} />
             <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} hitSlop={10} onPress={() => setShowPassword(!showPassword)}><Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.muted} /></Pressable>
           </View>
 

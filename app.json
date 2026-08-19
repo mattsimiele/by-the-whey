@@ -68,7 +68,7 @@
       "package": "com.thecurdnerd.bythewhey",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/by-the-whey-character.png",
+        "foregroundImage": "./assets/by-the-whey-adaptive.png",
         "backgroundColor": "#9ED6F9"
       },
       "softwareKeyboardLayoutMode": "resize"

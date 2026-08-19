@@ -180,7 +180,7 @@ function ModalHeader({ title, onClose }: { title: string; onClose: () => void })
 
 function Field(props: React.ComponentProps<typeof TextInput> & { label: string }) {
   const { label, multiline, ...inputProps } = props;
-  return <View><Text style={styles.label}>{label.toUpperCase()}</Text><TextInput {...inputProps} multiline={multiline} placeholderTextColor="#9B958A" style={[styles.input, multiline && styles.multiline]} /></View>;
+  return <View><Text style={styles.label}>{label.toUpperCase()}</Text><TextInput {...inputProps} multiline={multiline} placeholderTextColor={colors.placeholder} style={[styles.input, multiline && styles.multiline]} /></View>;
 }
 
 const styles = StyleSheet.create({
