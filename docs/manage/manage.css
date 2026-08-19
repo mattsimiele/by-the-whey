@@ -15,7 +15,7 @@ label { display: grid; gap: 8px; color: var(--ink); font-size: .76rem; font-weig
 input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 14px; outline: none; background: white; color: var(--ink); font: inherit; font-size: 1rem; letter-spacing: 0; text-transform: none; }
 input, select { min-height: 52px; padding: 0 15px; }
 textarea { padding: 14px 15px; resize: vertical; line-height: 1.5; }
-input:focus, select:focus, textarea:focus { border-color: var(--wine); box-shadow: 0 0 0 3px rgba(115,33,63,.1); }
+input:focus, select:focus, textarea:focus { border-color: var(--wine); box-shadow: 0 0 0 3px rgba(237,150,73,.2); }
 .auth-card label + label { margin-top: 18px; }
 .full-button { width: 100%; cursor: pointer; }
 button.button { font: inherit; cursor: pointer; }

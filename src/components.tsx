@@ -6,11 +6,12 @@ import { colors, shadow } from './theme';
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <View style={styles.brand}>
-      <View style={[styles.mark, compact && styles.markCompact]}>
-        <View style={styles.wedgeDot} />
-        <View style={[styles.wedgeDot, { left: 15, top: 18, width: 4, height: 4 }]} />
-        <View style={[styles.wedgeDot, { left: 9, top: 9, width: 3, height: 3 }]} />
-      </View>
+      <Image
+        accessibilityIgnoresInvertColors
+        source={require('../assets/by-the-whey-character.png')}
+        style={[styles.mark, compact && styles.markCompact]}
+        resizeMode="contain"
+      />
       <View>
         <Text style={[styles.brandName, compact && styles.brandNameCompact]}>BY THE WHEY</Text>
         {!compact && <Text style={styles.byline}>BUILT BY THE CURD NERD</Text>}
@@ -64,9 +65,8 @@ export function PrimaryButton({ label, icon, onPress, secondary = false, disable
 
 const styles = StyleSheet.create({
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  mark: { width: 38, height: 34, borderTopLeftRadius: 18, borderBottomLeftRadius: 18, borderTopRightRadius: 5, borderBottomRightRadius: 5, backgroundColor: colors.gold, transform: [{ rotate: '-4deg' }] },
-  markCompact: { width: 30, height: 27 },
-  wedgeDot: { position: 'absolute', width: 6, height: 6, borderRadius: 9, left: 22, top: 8, backgroundColor: colors.cream, opacity: 0.8 },
+  mark: { width: 44, height: 44 },
+  markCompact: { width: 34, height: 34 },
   brandName: { color: colors.ink, fontSize: 20, lineHeight: 21, letterSpacing: 2.2, fontWeight: '800' },
   brandNameCompact: { fontSize: 16, letterSpacing: 1.8 },
   byline: { color: colors.muted, marginTop: 3, fontSize: 8, letterSpacing: 1.7, fontWeight: '700' },

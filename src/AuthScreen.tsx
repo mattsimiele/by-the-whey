@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -228,9 +229,7 @@ export function AuthScreen({ onGuest }: { onGuest: () => void }) {
         <View style={styles.brandWrap}><Brand /></View>
         <View style={styles.hero}>
           <View style={styles.wheel}>
-            <View style={styles.wheelInner}>
-              <Ionicons name="restaurant-outline" size={44} color={colors.wine} />
-            </View>
+            <Image accessibilityLabel="By the Whey cheese character" source={require('../assets/by-the-whey-character.png')} style={styles.heroCharacter} resizeMode="contain" />
           </View>
           <Text style={styles.title}>{mode === 'signUp' ? 'Find your next favorite.' : 'Welcome back.'}</Text>
           <Text style={styles.subtitle}>
@@ -338,8 +337,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 22, paddingTop: 20, paddingBottom: 30 },
   brandWrap: { alignItems: 'center', marginBottom: 28 },
   hero: { alignItems: 'center' },
-  wheel: { width: 104, height: 104, borderRadius: 52, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  wheelInner: { width: 78, height: 78, borderRadius: 39, backgroundColor: colors.cream, borderWidth: 1, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
+  wheel: { width: 126, height: 126, borderRadius: 63, backgroundColor: colors.blush, borderWidth: 1, borderColor: colors.sky, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  heroCharacter: { width: 108, height: 108 },
   title: { color: colors.ink, fontSize: 30, fontWeight: '800', textAlign: 'center', letterSpacing: -1 },
   subtitle: { color: colors.muted, fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 315, marginTop: 8 },
   card: { backgroundColor: colors.white, borderRadius: 24, borderWidth: 1, borderColor: colors.line, padding: 18, marginTop: 25, ...shadow },

@@ -34,8 +34,10 @@ Real producer or retailer photography should not be copied merely because it is 
 
 | Asset | Current use | Release status |
 | --- | --- | --- |
-| `assets/icon.png` | iOS/Android app icon and splash source | Temporary; replace with the artist-approved final icon and record ownership/permission |
-| `docs/assets/curd-nerd-icon.png` | Public website brand artwork | Confirm it is The Curd Nerd-owned and document permission for website/social/store use |
+| `assets/icon.png` | Artist-supplied iOS/Android app icon source | Confirm the artist agreement permits app-store, website, social, and promotional use |
+| `assets/by-the-whey-character.png` | Artist-supplied transparent in-app brand character and splash artwork | Confirm the artist agreement permits app-store, website, social, and promotional use |
+| `docs/assets/by-the-whey-icon.png` | Artist-supplied public website icon and social preview | Confirm the artist agreement permits website/social/store use |
+| `docs/assets/by-the-whey-character.png` | Artist-supplied public website wordmark character | Confirm the artist agreement permits website/social/store use |
 | `store/android/assets/feature-graphic.png` | Google Play feature graphic | Dimensions pass; re-export or approve after the final icon is supplied and record the source assets |
 | User-uploaded tasting/catalog photos | In-app UGC | Moderation exists; Terms require upload rights, but operational takedown handling must remain active |
 

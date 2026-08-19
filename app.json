@@ -68,8 +68,8 @@
       "package": "com.thecurdnerd.bythewhey",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#F6F0E3"
+        "foregroundImage": "./assets/by-the-whey-character.png",
+        "backgroundColor": "#9ED6F9"
       },
       "softwareKeyboardLayoutMode": "resize"
     },
@@ -82,10 +82,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/icon.png",
+          "image": "./assets/by-the-whey-character.png",
           "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#F6F0E3"
+          "backgroundColor": "#9ED6F9"
         }
       ],
       [
