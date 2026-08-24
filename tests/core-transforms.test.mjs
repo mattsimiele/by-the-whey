@@ -5,6 +5,7 @@ import {
   createLegalAcceptanceMetadata,
   normalizeHandle,
   parseAuthCallbackUrl,
+  parseCheeseDeepLink,
   splitCatalogList,
 } from '../src/lib/coreTransforms.ts';
 
@@ -29,8 +30,13 @@ test('parses OAuth code, token, and readable error callback forms', () => {
   assert.equal(parseAuthCallbackUrl('bythewhey://auth/callback?error_description=Access+denied').error, 'Access denied');
 });
 
+test('parses public catalog links that open a cheese in the app', () => {
+  assert.equal(parseCheeseDeepLink('bythewhey://cheese/afterglow'), 'afterglow');
+  assert.equal(parseCheeseDeepLink('bythewhey://cheese/t%C3%AAte-de-moine?source=web'), 'tête-de-moine');
+  assert.equal(parseCheeseDeepLink('bythewhey://auth/callback?code=abc'), null);
+});
+
 test('normalizes catalog lists and slugs', () => {
   assert.deepEqual(splitCatalogList('brothy, toasted nuts\ncaramelized onion'), ['brothy', 'toasted nuts', 'caramelized onion']);
   assert.equal(catalogSlug('Tête de Moine'), 'tete-de-moine');
 });
-

@@ -50,8 +50,14 @@ export function collectPreflightFailures() {
     if (!transforms.includes(marker)) failures.push(`Legal acceptance metadata is missing ${marker}`);
   }
 
-  const requiredPages = ['docs/privacy/index.html', 'docs/terms/index.html', 'docs/guidelines/index.html', 'docs/support/index.html', 'docs/delete-account/index.html'];
+  const requiredPages = ['docs/catalog/index.html', 'docs/privacy/index.html', 'docs/terms/index.html', 'docs/guidelines/index.html', 'docs/support/index.html', 'docs/delete-account/index.html'];
   for (const page of requiredPages) if (!fs.existsSync(path.join(root, page))) failures.push(`Missing public release page: ${page}`);
+
+  const generatedCatalog = JSON.parse(read('docs/cheese/generated.json'));
+  if (!generatedCatalog.count || generatedCatalog.count !== generatedCatalog.slugs?.length) failures.push('Generated public cheese pages are missing or inconsistent');
+  for (const slug of generatedCatalog.slugs ?? []) {
+    if (!fs.existsSync(path.join(root, 'docs/cheese', slug, 'index.html'))) failures.push(`Missing generated cheese page: ${slug}`);
+  }
 
   return failures;
 }

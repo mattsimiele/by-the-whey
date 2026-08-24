@@ -17,6 +17,7 @@ By the Whey is a cross-platform social cheese journal for discovering cheeses, l
 - Reporting, blocking, moderation queues, photo review, account enforcement, and in-app account deletion
 - Persistent catalog/feed caching with offline messaging and reconnection recovery
 - Authenticated web Catalog Studio for catalog corrections and submission review
+- Public web catalog with live search, nine style filters, community sorting, approved photography, and generated shareable cheese pages
 
 ## Run locally
 
@@ -43,6 +44,12 @@ This uses the bundled Node/pnpm runtime, verifies the lockfile, runs automated r
 Android EAS preview and production profiles, Play listing copy, Data Safety notes, content declarations, tester instructions, artwork, and the release runbook are ready. Start with [`docs/ANDROID_BETA_RELEASE.md`](docs/ANDROID_BETA_RELEASE.md).
 
 ## Web catalog management
+
+The public catalog is available at `https://bythe-whey.com/catalog/`. Every published cheese has a generated, search-engine-friendly page at `/cheese/<slug>/` with live Supabase refresh, community ratings, approved photography, full catalog details, and an app deep link. Regenerate static metadata, pages, and the sitemap after publishing or renaming cheeses with:
+
+```bash
+pnpm web:catalog
+```
 
 The authenticated Catalog Studio is published at `https://bythe-whey.com/manage/`. It uses the same Supabase database and Row Level Security policies as the mobile app:
 

@@ -37,6 +37,7 @@ import { isSupabaseConfigured, supabase } from './src/lib/supabase';
 import { chooseReportReason } from './src/reporting';
 import { colors, shadow } from './src/theme';
 import { readCache, writeCache } from './src/cache';
+import { parseCheeseDeepLink } from './src/lib/coreTransforms';
 
 type Tab = 'feed' | 'discover' | 'log' | 'cellar' | 'profile';
 type UserProfile = ProfileRecord & { role: Role; role_approved: boolean; account_status?: 'active' | 'warned' | 'suspended'; moderation_note?: string | null };
@@ -1116,12 +1117,35 @@ function Root({ profile, signedIn, userId, onAccountDeleted, onProfileUpdated }:
   const [focusedPostId, setFocusedPostId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [connectionReload, setConnectionReload] = useState(0);
+  const [pendingCheeseSlug, setPendingCheeseSlug] = useState<string | null>(null);
   const promptedForProfileName = useRef(false);
   const openNotifications = () => signedIn ? setNotificationsOpen(true) : Alert.alert('Sign in required', 'Create an account to receive community notifications.');
   const refreshCommunity = () => {
     setFeedReload((value) => value + 1);
     setCatalogReload((value) => value + 1);
   };
+
+  useEffect(() => {
+    const handleCatalogLink = (url: string) => {
+      const slug = parseCheeseDeepLink(url);
+      if (slug) setPendingCheeseSlug(slug);
+    };
+    Linking.getInitialURL().then((url) => { if (url) handleCatalogLink(url); });
+    const listener = Linking.addEventListener('url', ({ url }) => handleCatalogLink(url));
+    return () => listener.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!pendingCheeseSlug || !catalog.length) return;
+    const cheese = catalog.find((item) => item.id === pendingCheeseSlug);
+    setPendingCheeseSlug(null);
+    if (!cheese) {
+      Alert.alert('Cheese unavailable', 'This catalog entry is not currently published.');
+      return;
+    }
+    setTab('discover');
+    setSelectedCheese(cheese);
+  }, [pendingCheeseSlug, catalog]);
 
   useEffect(() => {
     if (!signedIn) {

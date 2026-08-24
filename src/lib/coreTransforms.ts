@@ -19,6 +19,16 @@ export function parseAuthCallbackUrl(url: string) {
   };
 }
 
+export function parseCheeseDeepLink(url: string) {
+  const match = url.match(/^bythewhey:\/\/cheese\/([^/?#]+)/i);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
 export function splitCatalogList(value: string) {
   return value.split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
 }
@@ -26,4 +36,3 @@ export function splitCatalogList(value: string) {
 export function catalogSlug(value: string) {
   return value.toLowerCase().trim().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
-

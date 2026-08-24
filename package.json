@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
+    "web:catalog": "node scripts/generate-web-catalog.mjs",
     "release:preflight": "pnpm test && pnpm typecheck && node scripts/release-preflight.mjs",
     "release": "pnpm release:preflight && eas build --platform ios --profile production --auto-submit --wait && eas build --platform android --profile production --wait",
     "release:ios": "pnpm release:preflight && eas build --platform ios --profile production --auto-submit",
