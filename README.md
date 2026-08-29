@@ -4,6 +4,8 @@
 
 By the Whey is a cross-platform social cheese journal for discovering cheeses, logging tastings, and sharing recommendations with other turophiles.
 
+> **Proprietary project:** This repository is publicly visible, but it is not open source. Copyright © 2026 The Curd Nerd LLC. All rights reserved. See [`LICENSE`](LICENSE) and [`RIGHTS.md`](RIGHTS.md) before using any code, catalog content, photography, artwork, or brand assets.
+
 ## What is included
 
 - Polished iOS and Android interface built with React Native and Expo
@@ -155,6 +157,16 @@ Last reviewed against the codebase and live backend on **August 9, 2026**. “Im
 6. Defer monetization until beta retention and logging behavior are understood. Premium palate insights, producer/retailer profiles, affiliate storefront links, and restrained sponsored discovery fit the product better than an ad-heavy feed.
 
 The support contact is `support@thecurdnerd.com`. See [`docs/MODERATION.md`](docs/MODERATION.md) for the operational moderation workflow.
+
+## Intellectual property
+
+- Original By the Whey code, documentation, editorial content, and design implementation are proprietary and are not licensed for reuse.
+- Original catalog descriptions and the protectable selection, coordination, and arrangement of the catalog are reserved to The Curd Nerd LLC to the extent owned and protectable by law.
+- Individual facts, user-owned submissions, and third-party materials are not claimed as exclusive property of The Curd Nerd LLC.
+- “By the Whey,” “The Curd Nerd,” the logos, and the cheese character may not be used to imply affiliation or endorsement.
+- External contributions require a written ownership or licensing agreement before acceptance. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+For permissions or commercial licensing, contact `support@thecurdnerd.com`.
 
 Release support documents:
 
