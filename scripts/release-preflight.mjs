@@ -61,6 +61,11 @@ export function collectPreflightFailures() {
     if (!siteShell.includes(marker)) failures.push(`Shared website navigation is missing ${marker}`);
   }
 
+  const catalogStudio = `${read('docs/manage/index.html')}\n${read('docs/manage/manage.js')}`;
+  for (const marker of ['data-photo-input', 'data-upload-photo', 'uploadCatalogPhoto', 'removeCatalogPhoto']) {
+    if (!catalogStudio.includes(marker)) failures.push(`Catalog Studio photo management is missing ${marker}`);
+  }
+
   const generatedCatalog = JSON.parse(read('docs/cheese/generated.json'));
   if (!generatedCatalog.count || generatedCatalog.count !== generatedCatalog.slugs?.length) failures.push('Generated public cheese pages are missing or inconsistent');
   for (const slug of generatedCatalog.slugs ?? []) {

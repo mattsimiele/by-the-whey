@@ -77,6 +77,20 @@ button:disabled { cursor: wait; opacity: .55; }
 .form-grid.three { grid-template-columns: repeat(3, 1fr); }
 .span-two { grid-column: 1 / -1; }
 label small { color: var(--muted); font-size: .72rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.photo-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.photo-section-heading h3 { margin-bottom: 6px; }
+.photo-section-heading p { max-width: 540px; margin: 0; color: var(--muted); font-size: .88rem; }
+.photo-editor { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; margin-top: 22px; }
+.photo-preview { display: grid; overflow: hidden; aspect-ratio: 4 / 3; place-items: center; border: 1px solid var(--line); border-radius: 18px; background: var(--cream); }
+.photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.photo-placeholder { padding: 20px; color: var(--muted); font-size: .82rem; font-weight: 800; text-align: center; }
+.photo-editor-copy { align-self: center; }
+.photo-editor-copy > strong { display: block; font-family: Georgia, serif; font-size: 1.3rem; }
+.photo-editor-copy > p:not(.form-message) { margin: 7px 0 0; color: var(--muted); font-size: .86rem; }
+.photo-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.photo-picker { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.photo-message { margin-bottom: 0; }
+.photo-unavailable { margin-top: 18px; padding: 18px; border-radius: 14px; background: var(--cream-deep); color: var(--muted); font-size: .86rem; }
 .editor-actions { position: sticky; bottom: -50px; display: flex; justify-content: flex-end; gap: 10px; margin: 10px -38px -50px; padding: 20px 38px; border-top: 1px solid var(--line); background: rgba(255,253,248,.96); backdrop-filter: blur(14px); }
 .toast { position: fixed; z-index: 60; right: 24px; bottom: 24px; max-width: 420px; padding: 15px 18px; border-radius: 14px; background: var(--wine-dark); color: white; box-shadow: var(--shadow); font-weight: 750; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
@@ -106,5 +120,9 @@ label small { color: var(--muted); font-size: .72rem; font-weight: 600; letter-s
   .review-actions { align-items: stretch; flex-direction: column-reverse; }
   .editor-sheet { padding: 24px 18px 40px; }
   .form-grid.two, .form-grid.three { grid-template-columns: 1fr; }
+  .photo-editor { grid-template-columns: 1fr; }
+  .photo-preview { width: min(100%, 360px); }
+  .photo-actions { align-items: stretch; flex-direction: column; }
+  .photo-actions .button, .photo-actions .small-button { width: 100%; }
   .editor-actions { bottom: -40px; margin: 10px -18px -40px; padding: 15px 18px; }
 }

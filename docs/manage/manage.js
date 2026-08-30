@@ -9,7 +9,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 
 const $ = (selector, parent = document) => parent.querySelector(selector);
 const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
-const state = { user: null, profile: null, catalog: [], pending: [], activeTab: 'catalog' };
+const state = { user: null, profile: null, catalog: [], pending: [], activeTab: 'catalog', editorCheese: null, editorPhotoUrl: null };
 
 const views = {
   auth: $('[data-auth-view]'), denied: $('[data-access-denied]'), workspace: $('[data-workspace]'),
@@ -90,7 +90,7 @@ async function loadEverything() {
 
 async function loadCatalog() {
   $('[data-catalog-status]').textContent = 'Loading the catalog…';
-  const { data, error } = await supabase.from('cheeses').select('*').eq('status', 'published').order('name');
+  const { data, error } = await supabase.from('cheeses').select('*,cheese_photos(id,storage_path,moderation_status,created_at)').eq('status', 'published').order('name');
   if (error) { $('[data-catalog-status]').textContent = readableError(error); return; }
   state.catalog = data || [];
   $('[data-published-count]').textContent = state.catalog.length;
@@ -99,7 +99,7 @@ async function loadCatalog() {
 }
 
 async function loadPending() {
-  const { data, error } = await supabase.from('cheeses').select('*').in('status', ['pending', 'draft']).order('created_at');
+  const { data, error } = await supabase.from('cheeses').select('*,cheese_photos(id,storage_path,moderation_status,created_at)').in('status', ['pending', 'draft']).order('created_at');
   if (error) { $('[data-review-status]').textContent = readableError(error); return; }
   state.pending = data || [];
   $('[data-pending-count]').textContent = state.pending.length;
@@ -120,7 +120,7 @@ function renderCatalog() {
       <div><h3>${escapeHtml(cheese.name)}</h3><p>${escapeHtml(cheese.creamery_name)}</p></div>
       <span>${escapeHtml([cheese.location_city, cheese.location_region, cheese.location_country].filter(Boolean).join(', '))}</span>
       <span class="category-chip">${escapeHtml(cheese.catalog_category || cheese.cheese_style)}</span>
-      ${state.profile.role === 'admin' ? `<button class="small-button" type="button" data-edit-cheese="${cheese.id}">Edit info</button>` : '<span></span>'}
+      ${state.profile.role === 'admin' ? `<button class="small-button" type="button" data-edit-cheese="${cheese.id}">Edit cheese</button>` : '<span></span>'}
     </article>`).join('');
 }
 
@@ -142,6 +142,161 @@ function renderPending() {
     </article>`).join('');
 }
 
+function publicCatalogPhotoUrl(storagePath) {
+  if (!storagePath) return '';
+  if (/^https?:\/\//i.test(storagePath)) return storagePath;
+  return supabase.storage.from('cheese-photos').getPublicUrl(storagePath).data.publicUrl;
+}
+
+function approvedCatalogPhotos(cheese) {
+  return (cheese?.cheese_photos || [])
+    .filter((photo) => photo.moderation_status === 'approved')
+    .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)));
+}
+
+function currentCatalogPhoto(cheese) {
+  const approved = approvedCatalogPhotos(cheese)[0];
+  if (approved) return { ...approved, source: 'record' };
+  if (cheese?.image_path) return { id: null, storage_path: cheese.image_path, source: 'legacy' };
+  return null;
+}
+
+function clearPhotoDraft() {
+  if (state.editorPhotoUrl) URL.revokeObjectURL(state.editorPhotoUrl);
+  state.editorPhotoUrl = null;
+  const input = $('[data-photo-input]');
+  if (input) input.value = '';
+}
+
+function setPhotoMessage(text, success = false) {
+  message($('[data-photo-message]'), text, success);
+}
+
+function renderPhotoEditor(cheese) {
+  clearPhotoDraft();
+  state.editorCheese = cheese || null;
+  const controls = $('[data-photo-controls]');
+  const unavailable = $('[data-photo-unavailable]');
+  const preview = $('[data-photo-preview]');
+  const placeholder = $('[data-photo-placeholder]');
+  const upload = $('[data-upload-photo]');
+  const remove = $('[data-remove-photo]');
+  setPhotoMessage('');
+
+  if (!cheese?.id || state.profile.role !== 'admin') {
+    controls.hidden = true;
+    unavailable.hidden = false;
+    unavailable.textContent = cheese?.id ? 'Only administrators can replace a published catalog photo.' : 'Save this cheese first, then reopen it to add its catalog photo.';
+    return;
+  }
+
+  controls.hidden = false;
+  unavailable.hidden = true;
+  upload.disabled = true;
+  upload.textContent = 'Upload photo';
+  const current = currentCatalogPhoto(cheese);
+  preview.hidden = !current;
+  placeholder.hidden = Boolean(current);
+  remove.hidden = !current;
+  $('[data-photo-title]').textContent = current ? 'Current published photo' : 'No photo is currently published.';
+  $('[data-photo-description]').textContent = current
+    ? 'Choose a replacement or remove this image. Replacing it updates the association immediately.'
+    : 'Choose a JPEG, PNG, or WebP image up to 10 MB. It will become the approved catalog photo immediately.';
+  if (current) {
+    preview.src = publicCatalogPhotoUrl(current.storage_path);
+    preview.alt = `${cheese.name} catalog photo`;
+  } else {
+    preview.removeAttribute('src');
+    preview.alt = '';
+  }
+}
+
+function updateCheesePhotoState(cheeseId, photos, imagePath = null) {
+  const update = (cheese) => cheese.id === cheeseId ? { ...cheese, cheese_photos: photos, image_path: imagePath } : cheese;
+  state.catalog = state.catalog.map(update);
+  state.pending = state.pending.map(update);
+  state.editorCheese = [...state.catalog, ...state.pending].find((cheese) => cheese.id === cheeseId) || null;
+}
+
+async function uploadCatalogPhoto() {
+  const cheese = state.editorCheese;
+  const file = $('[data-photo-input]').files?.[0];
+  const button = $('[data-upload-photo]');
+  if (!cheese?.id || !file || state.profile.role !== 'admin') return;
+
+  button.disabled = true;
+  setPhotoMessage('Uploading and publishing photo…');
+  const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+  const storagePath = `${state.user.id}/${cheese.id}/${Date.now()}.${extension}`;
+  const { error: uploadError } = await supabase.storage.from('cheese-photos').upload(storagePath, file, { contentType: file.type, cacheControl: '3600' });
+  if (uploadError) { setPhotoMessage(readableError(uploadError)); button.disabled = false; return; }
+
+  const reviewedAt = new Date().toISOString();
+  const { data: inserted, error: recordError } = await supabase.from('cheese_photos').insert({
+    cheese_id: cheese.id,
+    storage_path: storagePath,
+    submitted_by: state.user.id,
+    moderation_status: 'approved',
+    reviewed_by: state.user.id,
+    reviewed_at: reviewedAt,
+  }).select('id,storage_path,moderation_status,created_at').single();
+  if (recordError) {
+    await supabase.storage.from('cheese-photos').remove([storagePath]);
+    setPhotoMessage(readableError(recordError));
+    button.disabled = false;
+    return;
+  }
+
+  const replaced = approvedCatalogPhotos(cheese);
+  const replacedIds = replaced.map((photo) => photo.id).filter(Boolean);
+  if (replacedIds.length) {
+    const { error: demoteError } = await supabase.from('cheese_photos').update({ moderation_status: 'rejected', reviewed_by: state.user.id, reviewed_at: reviewedAt }).in('id', replacedIds);
+    if (demoteError) {
+      await supabase.from('cheese_photos').delete().eq('id', inserted.id);
+      await supabase.storage.from('cheese-photos').remove([storagePath]);
+      setPhotoMessage(`The replacement could not be activated: ${readableError(demoteError)}`);
+      button.disabled = false;
+      return;
+    }
+  }
+
+  await supabase.from('cheeses').update({ image_path: null }).eq('id', cheese.id);
+  if (replacedIds.length) await supabase.from('cheese_photos').delete().in('id', replacedIds);
+  const replacedPaths = [...new Set([...replaced.map((photo) => photo.storage_path), cheese.image_path].filter((path) => path && path !== storagePath && !/^https?:\/\//i.test(path)))];
+  const cleanup = replacedPaths.length ? await supabase.storage.from('cheese-photos').remove(replacedPaths) : { error: null };
+
+  updateCheesePhotoState(cheese.id, [inserted], null);
+  renderPhotoEditor(state.editorCheese);
+  setPhotoMessage(cleanup.error ? 'Photo published. An older stored file could not be cleaned up.' : 'Photo published and associated with this cheese.', true);
+  toast(`${cheese.name} now uses the new catalog photo.`);
+}
+
+async function removeCatalogPhoto() {
+  const cheese = state.editorCheese;
+  if (!cheese?.id || state.profile.role !== 'admin') return;
+  const approved = approvedCatalogPhotos(cheese);
+  const associatedPaths = [...new Set([...approved.map((photo) => photo.storage_path), cheese.image_path].filter(Boolean))];
+  const storedPaths = associatedPaths.filter((path) => !/^https?:\/\//i.test(path));
+  if (!associatedPaths.length || !confirm(`Remove the published catalog photo for ${cheese.name}? This also deletes the stored file.`)) return;
+
+  const button = $('[data-remove-photo]');
+  button.disabled = true;
+  setPhotoMessage('Removing photo…');
+  const ids = approved.map((photo) => photo.id).filter(Boolean);
+  if (ids.length) {
+    const { error } = await supabase.from('cheese_photos').delete().in('id', ids);
+    if (error) { setPhotoMessage(readableError(error)); button.disabled = false; return; }
+  }
+  const { error: cheeseError } = await supabase.from('cheeses').update({ image_path: null }).eq('id', cheese.id);
+  if (cheeseError) { setPhotoMessage(readableError(cheeseError)); button.disabled = false; return; }
+  const { error: storageError } = storedPaths.length ? await supabase.storage.from('cheese-photos').remove(storedPaths) : { error: null };
+
+  updateCheesePhotoState(cheese.id, [], null);
+  renderPhotoEditor(state.editorCheese);
+  setPhotoMessage(storageError ? 'Photo association removed. The old stored file could not be cleaned up.' : 'Catalog photo removed.', true);
+  toast(`${cheese.name} no longer has a catalog photo.`);
+}
+
 function populateEditor(cheese = null) {
   const form = $('[data-cheese-form]');
   form.reset();
@@ -154,12 +309,15 @@ function populateEditor(cheese = null) {
   $('[data-editor-kicker]').textContent = cheese?.status === 'published' ? 'Published catalog record' : cheese ? 'Submission review' : 'New catalog record';
   $('[data-save-cheese]').textContent = cheese?.status === 'published' ? 'Save corrections' : cheese && state.profile.role === 'admin' ? 'Save review changes' : 'Submit for review';
   message($('[data-editor-message]'), '');
+  renderPhotoEditor(cheese);
   views.modal.hidden = false;
   document.body.style.overflow = 'hidden';
   setTimeout(() => form.elements.name.focus(), 80);
 }
 
 function closeEditor() {
+  clearPhotoDraft();
+  state.editorCheese = null;
   views.modal.hidden = true;
   document.body.style.overflow = '';
 }
@@ -247,6 +405,27 @@ $('[data-denied-sign-out]').addEventListener('click', signOut);
 $('[data-new-cheese]').addEventListener('click', () => populateEditor());
 $$('[data-close-editor]').forEach((button) => button.addEventListener('click', closeEditor));
 $('[data-cheese-form]').addEventListener('submit', saveCheese);
+$('[data-photo-input]').addEventListener('change', (event) => {
+  const file = event.currentTarget.files?.[0];
+  const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!file) return;
+  if (!allowed.includes(file.type)) { event.currentTarget.value = ''; setPhotoMessage('Choose a JPEG, PNG, or WebP image.'); return; }
+  if (file.size > 10 * 1024 * 1024) { event.currentTarget.value = ''; setPhotoMessage('Choose an image smaller than 10 MB.'); return; }
+  if (state.editorPhotoUrl) URL.revokeObjectURL(state.editorPhotoUrl);
+  state.editorPhotoUrl = URL.createObjectURL(file);
+  const preview = $('[data-photo-preview]');
+  preview.src = state.editorPhotoUrl;
+  preview.alt = `Selected replacement for ${state.editorCheese?.name || 'catalog cheese'}`;
+  preview.hidden = false;
+  $('[data-photo-placeholder]').hidden = true;
+  $('[data-photo-title]').textContent = file.name;
+  $('[data-photo-description]').textContent = `${(file.size / 1024 / 1024).toFixed(1)} MB · Ready to upload`;
+  $('[data-upload-photo]').disabled = false;
+  $('[data-upload-photo]').textContent = currentCatalogPhoto(state.editorCheese) ? 'Replace photo' : 'Upload photo';
+  setPhotoMessage('');
+});
+$('[data-upload-photo]').addEventListener('click', uploadCatalogPhoto);
+$('[data-remove-photo]').addEventListener('click', removeCatalogPhoto);
 $('[data-search]').addEventListener('input', renderCatalog);
 $('[data-category-filter]').addEventListener('change', renderCatalog);
 $$('[data-tab]').forEach((button) => button.addEventListener('click', () => switchTab(button.dataset.tab)));

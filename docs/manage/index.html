@@ -9,9 +9,9 @@
   <title>Catalog Studio — By the Whey</title>
   <link rel="icon" href="/assets/by-the-whey-icon.png?v=20260819-art-r2">
   <link rel="stylesheet" href="/assets/styles.css?v=20260830-navigation">
-  <link rel="stylesheet" href="/manage/manage.css?v=20260819-brand-refresh">
+  <link rel="stylesheet" href="/manage/manage.css?v=20260830-catalog-photos">
   <script src="/assets/site.js?v=20260830-navigation" defer></script>
-  <script type="module" src="/manage/manage.js"></script>
+  <script type="module" src="/manage/manage.js?v=20260830-catalog-photos"></script>
 </head>
 <body class="studio-body">
   <header class="site-header">
@@ -98,6 +98,26 @@
       <form data-cheese-form>
         <input type="hidden" name="id">
         <div class="form-section"><h3>Identity</h3><div class="form-grid two"><label>Cheese name<input name="name" required></label><label>Creamery<input name="creamery_name" required></label></div></div>
+        <div class="form-section catalog-photo-section" data-photo-section>
+          <div class="photo-section-heading"><div><h3>Catalog photo</h3><p>Manage the image shown in Discover, the public catalog, and cheese details.</p></div><span class="role-badge">Admin</span></div>
+          <div class="photo-editor" data-photo-controls hidden>
+            <div class="photo-preview">
+              <img data-photo-preview alt="">
+              <div class="photo-placeholder" data-photo-placeholder>No catalog photo</div>
+            </div>
+            <div class="photo-editor-copy">
+              <strong data-photo-title>No photo is currently published.</strong>
+              <p data-photo-description>Choose a JPEG, PNG, or WebP image up to 10 MB. A new upload replaces every currently approved photo for this cheese.</p>
+              <div class="photo-actions">
+                <label class="small-button photo-picker">Choose photo<input class="sr-only" type="file" accept="image/jpeg,image/png,image/webp" data-photo-input></label>
+                <button class="button" type="button" data-upload-photo disabled>Upload photo</button>
+                <button class="small-button danger-button" type="button" data-remove-photo hidden>Remove photo</button>
+              </div>
+              <p class="form-message photo-message" data-photo-message aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="photo-unavailable" data-photo-unavailable>Save this cheese first, then reopen it to add its catalog photo.</div>
+        </div>
         <div class="form-section"><h3>Origin</h3><div class="form-grid three"><label>City<input name="location_city" required></label><label>Region / state<input name="location_region" required></label><label>Country<input name="location_country" required value="USA"></label></div></div>
         <div class="form-section"><h3>Classification</h3><div class="form-grid two"><label>Catalog category<select name="catalog_category" required></select></label><label>Cheese style<input name="cheese_style" required placeholder="e.g. cheddar"></label><label>Milk type<input name="milk_type" required placeholder="e.g. raw cow’s milk"></label><label>Rennet<input name="rennet" required placeholder="e.g. animal"></label><label class="span-two">Age (if applicable)<input name="age_description" required></label></div></div>
         <div class="form-section"><h3>Tasting information</h3><div class="form-grid"><label>Flavor profile<textarea name="flavor_profile" required rows="3" placeholder="Separate each flavor with a comma or a new line"></textarea><small>Example: brothy, caramelized onions, toasted nuts</small></label><label>Story / notes<textarea name="story_notes" required rows="5"></textarea></label><label>Pairings<textarea name="pairings" required rows="4" placeholder="Separate each pairing with a comma or a new line"></textarea></label></div></div>
