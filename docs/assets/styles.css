@@ -48,6 +48,7 @@ img { display: block; max-width: 100%; }
 .nav-links a:hover, .nav-links a[aria-current="page"] { color: var(--wine); }
 .nav-cta { padding: 10px 16px; border-radius: 999px; background: var(--wine); color: white !important; }
 .menu-toggle { display: none; border: 0; background: transparent; color: var(--wine); font: inherit; font-weight: 800; }
+.nav-links .studio-account { padding-left: 18px; border-left: 1px solid var(--line); }
 
 .hero { position: relative; overflow: hidden; padding: 88px 0 100px; }
 .hero::before { content: ""; position: absolute; width: 520px; height: 520px; right: -180px; top: -160px; border: 1px solid rgba(237,150,73,.34); border-radius: 50%; box-shadow: 0 0 0 72px rgba(158,214,249,.13), 0 0 0 145px rgba(237,150,73,.045); }
@@ -106,6 +107,7 @@ h1 { max-width: 760px; margin-bottom: 24px; font-size: clamp(3.6rem, 8vw, 7.4rem
 .footer-grid { display: flex; align-items: flex-start; justify-content: space-between; gap: 40px; }
 .footer-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 18px 28px; }
 .footer-links a { color: var(--muted); font-size: .85rem; font-weight: 700; text-decoration: none; }
+.footer-links a:hover, .footer-links a:focus-visible { color: var(--wine); }
 .copyright { margin-top: 18px; color: var(--muted); font-size: .78rem; }
 
 .legal-hero { padding: 72px 0 40px; }
@@ -126,6 +128,7 @@ h1 { max-width: 760px; margin-bottom: 24px; font-size: clamp(3.6rem, 8vw, 7.4rem
   .menu-toggle { display: block; }
   .nav-links { display: none; position: absolute; inset: 76px 20px auto; padding: 22px; border: 1px solid var(--line); border-radius: 22px; background: var(--paper); box-shadow: var(--shadow); flex-direction: column; align-items: stretch; }
   .nav-links[data-open] { display: flex; }
+  .nav-links .studio-account { justify-content: space-between; padding: 14px 0 0; border-top: 1px solid var(--line); border-left: 0; }
   .hero { padding-top: 60px; }
   .hero-grid, .section-heading, .catalog-showcase, .legal-layout { grid-template-columns: 1fr; }
   .hero-grid { gap: 48px; }

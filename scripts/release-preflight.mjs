@@ -50,13 +50,23 @@ export function collectPreflightFailures() {
     if (!transforms.includes(marker)) failures.push(`Legal acceptance metadata is missing ${marker}`);
   }
 
-  const requiredPages = ['docs/catalog/index.html', 'docs/privacy/index.html', 'docs/terms/index.html', 'docs/guidelines/index.html', 'docs/support/index.html', 'docs/delete-account/index.html'];
-  for (const page of requiredPages) if (!fs.existsSync(path.join(root, page))) failures.push(`Missing public release page: ${page}`);
+  const requiredPages = ['docs/index.html', 'docs/404.html', 'docs/catalog/index.html', 'docs/privacy/index.html', 'docs/terms/index.html', 'docs/guidelines/index.html', 'docs/support/index.html', 'docs/delete-account/index.html', 'docs/manage/index.html'];
+  for (const page of requiredPages) {
+    if (!fs.existsSync(path.join(root, page))) failures.push(`Missing public release page: ${page}`);
+    else if (!read(page).includes('assets/site.js')) failures.push(`${page} is missing the shared website navigation`);
+  }
+
+  const siteShell = read('docs/assets/site.js');
+  for (const marker of ['Why By the Whey', 'Catalog Studio', 'Delete Account', 'renderHeader()', 'renderFooter()']) {
+    if (!siteShell.includes(marker)) failures.push(`Shared website navigation is missing ${marker}`);
+  }
 
   const generatedCatalog = JSON.parse(read('docs/cheese/generated.json'));
   if (!generatedCatalog.count || generatedCatalog.count !== generatedCatalog.slugs?.length) failures.push('Generated public cheese pages are missing or inconsistent');
   for (const slug of generatedCatalog.slugs ?? []) {
-    if (!fs.existsSync(path.join(root, 'docs/cheese', slug, 'index.html'))) failures.push(`Missing generated cheese page: ${slug}`);
+    const page = path.join('docs/cheese', slug, 'index.html');
+    if (!fs.existsSync(path.join(root, page))) failures.push(`Missing generated cheese page: ${slug}`);
+    else if (!read(page).includes('assets/site.js')) failures.push(`Generated cheese page is missing the shared website navigation: ${slug}`);
   }
 
   return failures;
