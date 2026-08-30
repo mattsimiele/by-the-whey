@@ -21,6 +21,7 @@ function refresh(cheese) {
   setText('[data-cheese-rennet]', cheese.rennet);
   setText('[data-cheese-style]', cheese.cheese_style);
   setText('[data-cheese-age]', cheese.age_description);
+  setText('[data-cheese-case]', cheese.in_curd_nerd_case ? 'Yes' : 'No');
   setText('[data-cheese-story]', cheese.story_notes);
   setText('[data-cheese-rating]', cheese.rating_count ? cheese.average_rating.toFixed(1) : '—');
   setText('[data-cheese-rating-count]', ratingLabel(cheese));

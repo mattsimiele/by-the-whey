@@ -455,13 +455,13 @@ function CommentsModal({ post, userId, onCommented, onClose }: { post: Post | nu
 function DiscoverScreen({ openCheese, catalog, loading, error, unreadCount, onRetry, onNotifications }: { openCheese: (cheese: Cheese) => void; catalog: Cheese[]; loading: boolean; error: string | null; unreadCount: number; onRetry: () => void; onNotifications: () => void }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
-  const [sort, setSort] = useState<'Highest rated' | 'Most tasted' | 'Recently added' | 'Alphabetical'>('Highest rated');
+  const [sort, setSort] = useState<'Highest rated' | 'In the case first' | 'Most tasted' | 'Recently added' | 'Alphabetical'>('Highest rated');
   const filters = ['All', 'Alpine', 'Blue Cheese', 'Cheddar', 'Fresh Cheese', 'Gouda', 'Hard Aged Cheese', 'Soft Cheese', 'Tomme Style', 'Washed Rind'];
   const results = useMemo(() => catalog.filter((cheese) => {
     const matchesQuery = `${cheese.name} ${cheese.creamery} ${cheese.location} ${cheese.style} ${cheese.category} ${cheese.flavorProfile.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase());
     const matchesFilter = filter === 'All' || cheese.category === filter;
     return matchesQuery && matchesFilter;
-  }).sort((a, b) => sort === 'Highest rated' ? b.rating - a.rating || b.logs - a.logs : sort === 'Most tasted' ? b.logs - a.logs || b.rating - a.rating : sort === 'Recently added' ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : a.name.localeCompare(b.name)), [query, filter, sort, catalog]);
+  }).sort((a, b) => sort === 'Highest rated' ? b.rating - a.rating || b.logs - a.logs : sort === 'In the case first' ? Number(b.inCurdNerdCase) - Number(a.inCurdNerdCase) || b.rating - a.rating || a.name.localeCompare(b.name) : sort === 'Most tasted' ? b.logs - a.logs || b.rating - a.rating : sort === 'Recently added' ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : a.name.localeCompare(b.name)), [query, filter, sort, catalog]);
 
   return (
     <ScrollView contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled">
@@ -480,7 +480,7 @@ function DiscoverScreen({ openCheese, catalog, loading, error, unreadCount, onRe
       </ScrollView>
       <Text style={styles.sortLabel}>SORT BY</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortRow}>
-        {(['Highest rated', 'Most tasted', 'Recently added', 'Alphabetical'] as const).map((item) => <Pressable key={item} onPress={() => setSort(item)} style={[styles.sortPill, sort === item && styles.sortPillActive]}><Text style={[styles.sortText, sort === item && styles.sortTextActive]}>{item}</Text></Pressable>)}
+        {(['Highest rated', 'In the case first', 'Most tasted', 'Recently added', 'Alphabetical'] as const).map((item) => <Pressable key={item} onPress={() => setSort(item)} style={[styles.sortPill, sort === item && styles.sortPillActive]}><Text style={[styles.sortText, sort === item && styles.sortTextActive]}>{item}</Text></Pressable>)}
       </ScrollView>
 
       <SectionHeader title={`${results.length} ${filter === 'All' ? 'cheeses' : filter}`} />
@@ -496,6 +496,7 @@ function DiscoverScreen({ openCheese, catalog, loading, error, unreadCount, onRe
               <View style={styles.cheeseMetaRow}>
                 <Text style={styles.cheeseMeta}>{cheese.milkType} · {cheese.style}</Text>
               </View>
+              <Text style={[styles.caseAvailability, cheese.inCurdNerdCase && styles.caseAvailabilityActive]}>{cheese.inCurdNerdCase ? 'In the case at The Curd Nerd' : 'Not currently in the case'}</Text>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 12 }}>
               {cheese.logs > 0 ? (
@@ -963,7 +964,7 @@ function CheeseModal({ cheese, userId, onSavedChange, onTastingUpdated, onLog, o
           </View>
           <Text style={styles.detailDescription}>{cheese.story}</Text>
           <View style={styles.facts}>
-            {[['Creamery', cheese.creamery], ['Location', cheese.location], ['Milk type', cheese.milkType], ['Rennet', cheese.rennet], ['Style', cheese.style], ['Age', cheese.age]].map(([label, value]) => (
+            {[['Creamery', cheese.creamery], ['Location', cheese.location], ['Milk type', cheese.milkType], ['Rennet', cheese.rennet], ['Style', cheese.style], ['Age', cheese.age], ['In the Case at The Curd Nerd?', cheese.inCurdNerdCase ? 'Yes' : 'No']].map(([label, value]) => (
               <View key={label} style={styles.fact}><Text style={styles.factLabel}>{label?.toUpperCase()}</Text><Text style={styles.factValue}>{value}</Text></View>
             ))}
           </View>
@@ -1246,6 +1247,7 @@ function Root({ profile, signedIn, userId, onAccountDeleted, onProfileUpdated }:
         logs: ratings.get(row.id)?.count ?? 0,
         color: colors.gold,
         createdAt: row.created_at,
+        inCurdNerdCase: Boolean(row.in_curd_nerd_case),
         imageUrl: approvedPhoto ? supabase!.storage.from('cheese-photos').getPublicUrl(approvedPhoto.storage_path).data.publicUrl : undefined,
       } satisfies Cheese);
       });
@@ -1633,6 +1635,8 @@ const styles = StyleSheet.create({
   cheeseMaker: { color: colors.wine, fontSize: 10, fontWeight: '700', marginTop: 3 },
   cheeseMetaRow: { flexDirection: 'row', marginTop: 7 },
   cheeseMeta: { color: colors.muted, fontSize: 10 },
+  caseAvailability: { alignSelf: 'flex-start', marginTop: 7, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, overflow: 'hidden', backgroundColor: colors.cream, color: colors.muted, fontSize: 9, fontWeight: '700' },
+  caseAvailabilityActive: { backgroundColor: colors.blush, color: colors.sage },
   communityRating: { alignItems: 'flex-end', gap: 3 },
   communityRatingCount: { color: colors.muted, fontSize: 8, fontWeight: '700' },
   unratedText: { color: colors.muted, fontSize: 9, fontStyle: 'italic' },

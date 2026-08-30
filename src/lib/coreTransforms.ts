@@ -21,7 +21,7 @@ export function parseAuthCallbackUrl(url: string) {
 
 export function parseCheeseDeepLink(url: string) {
   const match = url.match(/^bythewhey:\/\/cheese\/([^/?#]+)/i);
-  if (!match) return null;
+  if (!match?.[1]) return null;
   try {
     return decodeURIComponent(match[1]);
   } catch {

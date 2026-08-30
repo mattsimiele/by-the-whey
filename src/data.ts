@@ -17,6 +17,7 @@ export type Cheese = {
   logs: number;
   color: string;
   createdAt: string;
+  inCurdNerdCase: boolean;
   imageUrl?: string;
 };
 

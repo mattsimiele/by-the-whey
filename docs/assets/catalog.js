@@ -18,6 +18,7 @@ function visibleCatalog() {
   });
   return filtered.sort((a, b) => {
     if (state.sort === 'Highest rated') return b.average_rating - a.average_rating || b.rating_count - a.rating_count || a.name.localeCompare(b.name);
+    if (state.sort === 'In the case first') return Number(b.in_curd_nerd_case) - Number(a.in_curd_nerd_case) || b.average_rating - a.average_rating || a.name.localeCompare(b.name);
     if (state.sort === 'Most tasted') return b.rating_count - a.rating_count || b.average_rating - a.average_rating || a.name.localeCompare(b.name);
     if (state.sort === 'Recently added') return new Date(b.created_at) - new Date(a.created_at);
     return a.name.localeCompare(b.name);
@@ -35,6 +36,7 @@ function card(cheese) {
       <h2><a href="/cheese/${encodeURIComponent(cheese.slug)}/">${escapeHtml(cheese.name)}</a></h2>
       <p class="public-cheese-maker">${escapeHtml(cheese.creamery_name)}</p>
       <p>${escapeHtml(locationLabel(cheese))}</p>
+      <p class="case-status ${cheese.in_curd_nerd_case ? 'is-available' : 'is-unavailable'}"><span aria-hidden="true">${cheese.in_curd_nerd_case ? '●' : '○'}</span> ${cheese.in_curd_nerd_case ? 'In the case at The Curd Nerd' : 'Not currently in the case'}</p>
       <a class="card-link" href="/cheese/${encodeURIComponent(cheese.slug)}/">Explore this cheese <span aria-hidden="true">→</span></a>
     </div>
   </article>`;

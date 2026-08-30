@@ -19,6 +19,8 @@
 .public-cheese-copy h2 a, .card-link { text-decoration: none; }
 .public-cheese-copy p { margin: 2px 0; color: var(--muted); font-size: .88rem; }
 .public-cheese-maker { color: var(--ink) !important; font-weight: 800; }
+.public-cheese-copy .case-status { display: inline-flex; align-items: center; gap: 7px; margin-top: 13px; padding: 7px 10px; border-radius: 999px; background: var(--cream); color: var(--muted); font-size: .72rem; font-weight: 800; }
+.public-cheese-copy .case-status.is-available { background: rgba(92, 124, 82, .12); color: #476440; }
 .card-link { display: inline-flex; gap: 8px; margin-top: 18px; color: var(--wine); font-size: .86rem; font-weight: 850; }
 .catalog-empty, .catalog-error { padding: 64px 24px; border: 1px dashed var(--line); border-radius: 28px; text-align: center; }
 .catalog-empty h2 { margin-bottom: 8px; font-size: 2rem; }
@@ -42,6 +44,7 @@
 .cheese-fact { padding: 19px; border-bottom: 1px solid var(--line); }
 .cheese-fact:nth-child(odd) { border-right: 1px solid var(--line); }
 .cheese-fact:nth-last-child(-n+2) { border-bottom: 0; }
+.cheese-fact:last-child:nth-child(odd) { grid-column: 1 / -1; border-right: 0; }
 .cheese-fact span { display: block; color: var(--wine); font-size: .65rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
 .cheese-fact strong { display: block; margin-top: 5px; font-size: .9rem; }
 .cheese-section { margin-top: 36px; }

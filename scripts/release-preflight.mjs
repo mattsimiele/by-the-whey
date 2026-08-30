@@ -65,6 +65,12 @@ export function collectPreflightFailures() {
   for (const marker of ['data-photo-input', 'data-upload-photo', 'uploadCatalogPhoto', 'removeCatalogPhoto']) {
     if (!catalogStudio.includes(marker)) failures.push(`Catalog Studio photo management is missing ${marker}`);
   }
+  for (const marker of ['in_curd_nerd_case', 'In the Case at The Curd Nerd?']) {
+    if (!catalogStudio.includes(marker)) failures.push(`Catalog Studio availability management is missing ${marker}`);
+  }
+  if (!read('docs/catalog/index.html').includes('In the case first')) failures.push('Public catalog availability sort is missing');
+  if (!read('App.tsx').includes('In the case first')) failures.push('Mobile catalog availability sort is missing');
+  if (!read('supabase/migrations/202608300001_curd_nerd_case_availability.sql').includes('in_curd_nerd_case')) failures.push('Catalog availability migration is missing');
 
   const generatedCatalog = JSON.parse(read('docs/cheese/generated.json'));
   if (!generatedCatalog.count || generatedCatalog.count !== generatedCatalog.slugs?.length) failures.push('Generated public cheese pages are missing or inconsistent');

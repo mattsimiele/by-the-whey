@@ -303,6 +303,7 @@ function populateEditor(cheese = null) {
   form.elements.id.value = cheese?.id || '';
   const fields = ['name', 'creamery_name', 'location_city', 'location_region', 'location_country', 'catalog_category', 'cheese_style', 'milk_type', 'rennet', 'age_description', 'story_notes'];
   fields.forEach((field) => { form.elements[field].value = cheese?.[field] || (field === 'location_country' ? 'USA' : ''); });
+  form.elements.in_curd_nerd_case.value = cheese?.in_curd_nerd_case ? 'true' : 'false';
   form.elements.flavor_profile.value = (cheese?.flavor_profile || []).join(', ');
   form.elements.pairings.value = (cheese?.pairings || []).join(', ');
   $('[data-editor-title]').textContent = cheese ? `Edit ${cheese.name}` : 'Add a cheese';
@@ -330,6 +331,7 @@ async function saveCheese(event) {
   const existing = [...state.catalog, ...state.pending].find((item) => item.id === id);
   const payload = {
     name: form.elements.name.value.trim(), creamery_name: form.elements.creamery_name.value.trim(),
+    in_curd_nerd_case: form.elements.in_curd_nerd_case.value === 'true',
     location_city: form.elements.location_city.value.trim(), location_region: form.elements.location_region.value.trim(), location_country: form.elements.location_country.value.trim(),
     catalog_category: form.elements.catalog_category.value, cheese_style: form.elements.cheese_style.value.trim(), milk_type: form.elements.milk_type.value.trim(),
     rennet: form.elements.rennet.value.trim(), age_description: form.elements.age_description.value.trim(),

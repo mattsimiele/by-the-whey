@@ -11,6 +11,7 @@ import { colors } from './theme';
 import { catalogSlug, splitCatalogList } from './lib/coreTransforms';
 
 type Draft = {
+  in_curd_nerd_case: boolean;
   name: string;
   creamery_name: string;
   location_city: string;
@@ -26,7 +27,10 @@ type Draft = {
   pairings: string;
 };
 
+type TextDraftKey = Exclude<keyof Draft, 'in_curd_nerd_case'>;
+
 const emptyDraft: Draft = {
+  in_curd_nerd_case: false,
   name: '',
   creamery_name: '',
   location_city: '',
@@ -126,7 +130,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     }
   }, [visible, role]);
 
-  const setField = (field: keyof Draft, value: string) => setDraft((current) => ({ ...current, [field]: value }));
+  const setField = (field: TextDraftKey, value: string) => setDraft((current) => ({ ...current, [field]: value }));
 
   const chooseDraftPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -140,7 +144,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
 
   const submit = async () => {
     if (!supabase) return;
-    const missing = Object.entries(draft).find(([, value]) => !value.trim());
+    const missing = Object.entries(draft).find(([, value]) => typeof value === 'string' && !value.trim());
     if (missing) return Alert.alert('Complete every field', 'Published cheese records require all catalog information.');
     setSaving(true);
     const slug = catalogSlug(draft.name);
@@ -234,6 +238,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     if (error || !data) return Alert.alert('Could not open cheese', error?.message ?? 'Cheese not found.');
     setDraft({
       name: data.name, creamery_name: data.creamery_name, location_city: data.location_city,
+      in_curd_nerd_case: Boolean(data.in_curd_nerd_case),
       location_region: data.location_region, location_country: data.location_country,
       milk_type: data.milk_type, rennet: data.rennet, cheese_style: data.cheese_style,
       catalog_category: data.catalog_category, age_description: data.age_description,
@@ -342,7 +347,7 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
     Alert.alert('Catalog photo updated', `${cheese.name} will use the new photo after the catalog refreshes.`);
   };
 
-  const fields: { key: keyof Draft; label: string; placeholder: string; multiline?: boolean }[] = [
+  const fields: { key: TextDraftKey; label: string; placeholder: string; multiline?: boolean }[] = [
     { key: 'name', label: 'Cheese name', placeholder: 'Shelburne 2 Year' },
     { key: 'creamery_name', label: 'Creamery', placeholder: 'Shelburne Farms' },
     { key: 'location_city', label: 'City', placeholder: 'Shelburne' },
@@ -386,6 +391,10 @@ export function CatalogManagement({ visible, role, userId, onClose }: { visible:
                 <TextInput value={draft[field.key]} onChangeText={(value) => setField(field.key, value)} placeholder={field.placeholder} placeholderTextColor={colors.placeholder} multiline={field.multiline} style={[styles.input, field.multiline && styles.multiline]} />
               </View>
             ))}
+            <Text style={styles.label}>IN THE CASE AT THE CURD NERD?</Text>
+            <View style={styles.caseChoices}>
+              {[true, false].map((available) => <Pressable key={String(available)} accessibilityRole="radio" accessibilityState={{ checked: draft.in_curd_nerd_case === available }} onPress={() => setDraft((current) => ({ ...current, in_curd_nerd_case: available }))} style={[styles.caseChoice, draft.in_curd_nerd_case === available && styles.caseChoiceActive]}><Text style={[styles.caseChoiceText, draft.in_curd_nerd_case === available && styles.caseChoiceTextActive]}>{available ? 'Yes' : 'No'}</Text></Pressable>)}
+            </View>
             <Text style={styles.label}>CATALOG PHOTO</Text>
             {draftPhoto ? <Image source={{ uri: draftPhoto.uri }} style={styles.reviewPhoto} /> : null}
             <Pressable onPress={chooseDraftPhoto} style={styles.photoPicker}><Ionicons name="image-outline" size={18} color={colors.wine} /><Text style={styles.rejectText}>{draftPhoto ? 'Choose a different photo' : 'Add real catalog photo'}</Text></Pressable>
@@ -523,6 +532,11 @@ const styles = StyleSheet.create({
   label: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1.3, marginTop: 12, marginBottom: 6 },
   input: { minHeight: 48, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 13, color: colors.ink, fontSize: 13 },
   multiline: { minHeight: 92, paddingTop: 13, textAlignVertical: 'top' },
+  caseChoices: { flexDirection: 'row', gap: 8 },
+  caseChoice: { flex: 1, minHeight: 44, borderWidth: 1, borderColor: colors.line, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
+  caseChoiceActive: { borderColor: colors.wine, backgroundColor: colors.blush },
+  caseChoiceText: { color: colors.muted, fontSize: 12, fontWeight: '800' },
+  caseChoiceTextActive: { color: colors.wine },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyTitle: { color: colors.ink, fontSize: 18, fontWeight: '800', marginTop: 12, marginBottom: 5 },
   submission: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 19, padding: 17, marginBottom: 13 },

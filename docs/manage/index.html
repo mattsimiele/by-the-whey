@@ -9,9 +9,9 @@
   <title>Catalog Studio — By the Whey</title>
   <link rel="icon" href="/assets/by-the-whey-icon.png?v=20260819-art-r2">
   <link rel="stylesheet" href="/assets/styles.css?v=20260830-navigation">
-  <link rel="stylesheet" href="/manage/manage.css?v=20260830-catalog-photos">
+  <link rel="stylesheet" href="/manage/manage.css?v=20260830-availability">
   <script src="/assets/site.js?v=20260830-navigation" defer></script>
-  <script type="module" src="/manage/manage.js?v=20260830-catalog-photos"></script>
+  <script type="module" src="/manage/manage.js?v=20260830-availability"></script>
 </head>
 <body class="studio-body">
   <header class="site-header">
@@ -97,7 +97,7 @@
       <header class="editor-header"><div><p class="eyebrow" data-editor-kicker>Catalog record</p><h2 id="editor-title" data-editor-title>Add a cheese</h2></div><button class="close-button" type="button" aria-label="Close editor" data-close-editor>×</button></header>
       <form data-cheese-form>
         <input type="hidden" name="id">
-        <div class="form-section"><h3>Identity</h3><div class="form-grid two"><label>Cheese name<input name="name" required></label><label>Creamery<input name="creamery_name" required></label></div></div>
+        <div class="form-section"><h3>Identity</h3><div class="form-grid two"><label>Cheese name<input name="name" required></label><label>Creamery<input name="creamery_name" required></label><label>In the Case at The Curd Nerd?<select name="in_curd_nerd_case" required><option value="false">No</option><option value="true">Yes</option></select></label></div></div>
         <div class="form-section catalog-photo-section" data-photo-section>
           <div class="photo-section-heading"><div><h3>Catalog photo</h3><p>Manage the image shown in Discover, the public catalog, and cheese details.</p></div><span class="role-badge">Admin</span></div>
           <div class="photo-editor" data-photo-controls hidden>
